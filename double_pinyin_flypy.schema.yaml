@@ -349,8 +349,8 @@ recognizer:
     uppercase: ""  # 覆写默认的 uppercase 使其可以在输入大写后，输入数字
 
 
-# key_binder:
-#   import_preset: default
+key_binder:
+  import_preset: default
 #   bindings:
 #     - {accept: "Control+Shift+E", toggle: emoji_suggestion, when: always}   # Emoji 快捷键
 #     - {accept: "Control+Shift+1", toggle: transcription, when: has_menu}           # 当存在候选菜单时，可以切换简体和繁体
