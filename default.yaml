@@ -11,8 +11,8 @@ config_version: "24.03.24"
 # 以下内容，实际会由default.custom.yaml和方案配置所覆写
 ## 九宫格依赖于 rime_mint ，如果需要使用其他方案（比如: 小鹤双拼的 九宫格），可以使用 custom 文件覆写
 schema_list:
-  - schema: rime_mint            # 薄荷拼音
   - schema: double_pinyin_flypy  # 小鹤双拼
+  - schema: rime_mint            # 薄荷拼音
   - schema: rime_mint_flypy      # 薄荷拼音-小鹤混输方案
   - schema: terra_pinyin         # 地球拼音-薄荷定制
   - schema: wubi98_mint          # 五笔98-五笔小筑
@@ -49,7 +49,7 @@ switcher:
 
 menu:
   # 候选词个数
-  page_size: 6
+  page_size: 5
 
 translator:
   # 启用自动造词
@@ -171,12 +171,12 @@ recognizer:
     uppercase: "[A-Z][-_+.'0-9A-Za-z]*$"  # 匹配大写字母开头的字符串
     url: "^(www[.]|https?:|ftp:|mailto:).*$|^[a-z]+[.].+$"  # 匹配 URL 或域名
 
-ascii_composer:
-  # 定义切换到西文模式的快捷键
-  switch_key:
-    Caps_Lock: commit_code  # 按下 Caps Lock 会直接上屏
-    Control_L: noop  # 按下左 Control 键不做任何操作
-    Control_R: noop  # 按下右 Control 键不做任何操作
-    Shift_L: commit_code  # 按下左 Shift 键会直接上屏
-    Shift_R: inline_ascii  # 按下右 Shift 键会临时切换到西文模式
-  good_old_caps_lock: true  # 启用经典的 Caps Lock 开启西文模式的方式
+# ascii_composer:
+#   # 定义切换到西文模式的快捷键
+#   switch_key:
+#     Caps_Lock: commit_code  # 按下 Caps Lock 会直接上屏
+#     Control_L: noop  # 按下左 Control 键不做任何操作
+#     Control_R: noop  # 按下右 Control 键不做任何操作
+#     Shift_L: commit_code  # 按下左 Shift 键会直接上屏
+#     Shift_R: inline_ascii  # 按下右 Shift 键会临时切换到西文模式
+#   good_old_caps_lock: true  # 启用经典的 Caps Lock 开启西文模式的方式

@@ -44,7 +44,7 @@ switches:
     reset: 0
   - name: ascii_punct
     states: [ "。，", "．，" ]
-    reset: 0
+    reset: 1
   - name: chaifen        # 拆字滤镜
     states: [ 🙈, 🐵 ]     # 快捷键 「Control+Shift+C」
     reset: 0
@@ -349,14 +349,14 @@ recognizer:
     uppercase: ""  # 覆写默认的 uppercase 使其可以在输入大写后，输入数字
 
 
-key_binder:
-  import_preset: default
-  bindings:
-    - {accept: "Control+Shift+E", toggle: emoji_suggestion, when: always}   # Emoji 快捷键
-    - {accept: "Control+Shift+1", toggle: transcription, when: has_menu}           # 当存在候选菜单时，可以切换简体和繁体
-    - {accept: "Control+Shift+exclam", toggle: transcription, when: has_menu}      # 当存在候选菜单时，可以切换简体和繁体（小狼毫可能读取这个）
-    - {accept: "Control+Shift+C", toggle: chaifen, when: has_menu}          # 拆字滤镜开关
+# key_binder:
+#   import_preset: default
+#   bindings:
+#     - {accept: "Control+Shift+E", toggle: emoji_suggestion, when: always}   # Emoji 快捷键
+#     - {accept: "Control+Shift+1", toggle: transcription, when: has_menu}           # 当存在候选菜单时，可以切换简体和繁体
+#     - {accept: "Control+Shift+exclam", toggle: transcription, when: has_menu}      # 当存在候选菜单时，可以切换简体和繁体（小狼毫可能读取这个）
+#     - {accept: "Control+Shift+C", toggle: chaifen, when: has_menu}          # 拆字滤镜开关
     
 menu:
   # 候选词个数
-  page_size: 6
+  page_size: 5
