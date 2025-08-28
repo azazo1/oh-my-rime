@@ -163,6 +163,7 @@ key_binder:
     - { when: always, accept: Control+Shift+5, toggle: extended_charset } # 切换扩展字符
     # - { when: always, accept: Shift+space, toggle: full_shape } # 另一种切换全角/半角的方式
     - { when: always, accept: Control+period, toggle: ascii_punct } # 切换中/西文标点
+    - { when: composing, accept: Control+bracketleft, send: Escape }         # ctrl+[ 取消输入
 
 recognizer:
   # 定义识别码的正则表达式规则
