@@ -48,12 +48,12 @@ style:
   remember_size: false
 
   # 外边框 圆角半径
-  corner_radius: 10
+  corner_radius: 8 # 这个圆角半径需要比下面的 hilited 大一点才行.
   # 色彩空间： srgb | display_p3
   color_space: srgb
   
   # 选中框 圆角半径
-  hilited_corner_radius: 0
+  hilited_corner_radius: 5
   
   # 窗口边界高度，大于圆角半径才生效
   border_height: 0
@@ -62,7 +62,7 @@ style:
   # 在堆叠(stacked)布局中,候选词之间的空间
   line_spacing: 5
   # 在非内嵌(inline_preedit)模式下，预编辑和候选词之间的空间
-  spacing: 10
+  spacing: 5
   # 预编辑和候选词的行长度(如果值>0则固定,否则为灵活/自动调整)。
   line_length: 0
 
