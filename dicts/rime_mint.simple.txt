@@ -1,0 +1,9 @@
+# Rime table
+# coding: utf-8
+#@/db_name	rime_mint.simple.txt
+#@/db_type	tabledb
+#
+#
+# 此行之后不能写注释
+是什么	uuem
+是什么	uume
