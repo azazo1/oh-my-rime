@@ -49,7 +49,7 @@ switcher:
 
 menu:
   # 候选词个数
-  page_size: 5
+  page_size: 4
 
 translator:
   # 启用自动造词

@@ -119,7 +119,7 @@ emoji_suggestion:
   option_name: emoji_suggestion
   tips: all
   inherit_comment: false
-  
+
 # 鹤形拆字辅助滤镜
 chaifen_cc:
   opencc_config: fly_Chaifen.json
@@ -180,7 +180,7 @@ reduce_english_filter:
   tad, tail, taj, tar, tax, tec, ted, tel, ter, tex, tic, tied, tier, ties, tim, tin, tit, tour, tout, tum,
   wag, wand, womens, wap, wax, weir, won,
   yan, yen]
-  
+
 # 中国农历配置
 chineseLunarCalendar_translator: lunar
 
@@ -367,7 +367,7 @@ key_binder:
 #     - {accept: "Control+Shift+1", toggle: transcription, when: has_menu}           # 当存在候选菜单时，可以切换简体和繁体
 #     - {accept: "Control+Shift+exclam", toggle: transcription, when: has_menu}      # 当存在候选菜单时，可以切换简体和繁体（小狼毫可能读取这个）
 #     - {accept: "Control+Shift+C", toggle: chaifen, when: has_menu}          # 拆字滤镜开关
-    
+
 menu:
   # 候选词个数
-  page_size: 5
+  page_size: 4
