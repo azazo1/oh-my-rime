@@ -32,7 +32,7 @@ switches:
     states: [ 中文, 英文 ]
   - name: emoji_suggestion
     states: [ "😣️","😁️"]
-    reset: 1
+    reset: 0
   - name: full_shape
     states: [ 半角, 全角 ]
     reset: 0
@@ -77,7 +77,7 @@ engine:
     - lua_translator@*mint_date_time_translator          # 时间、日期、星期、月份
     - lua_translator@*number_translator                  # 金额大小写
     - lua_translator@*chineseLunarCalendar_translator    # 农历
-    - lua_translator@*mint_calculator_translator         # 计算器（lua 动态表达式）
+    # - lua_translator@*mint_calculator_translator         # 计算器（lua 动态表达式）
     - table_translator@melt_eng                          # 英文输入（作为子翻译器，优先级需要比原生的低）
     - table_translator@cn_en                             # 中英混合词汇
     - reverse_lookup_translator@radical_reverse_lookup
