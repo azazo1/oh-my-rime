@@ -5,3 +5,10 @@ lua/seq_words.lua
 dist
 pro-*-fuzhu-dicts
 release_notes.md
+
+/wanxiang.userdb/
+/sync/
+*.userdb/
+/build/
+installation.yaml
+user.yaml
