@@ -16,6 +16,8 @@ Si	Si
 Cl	Cl
 Ar	Ar
 Ca	Ca
+MV	MV
+BD	BD
 Sc	Sc
 Ti	Ti
 Cr	Cr
@@ -4941,7 +4943,7 @@ avant-garde	avant-garde
 avarice	avarice
 avaricious	avaricious
 avariciously	avariciously
-AVAST!	AVAST!
+Avast	Avast
 avatar	avatar
 avatars	avatars
 avaya	avaya
@@ -7222,7 +7224,7 @@ bitch	bitch
 bitches	bitches
 bitcoin	bitcoin
 BitComet	BitComet
-bitdefender	bitdefender
+BitDefender	BitDefender
 bite	bite
 biter	biter
 biters	biters
@@ -16627,6 +16629,7 @@ datagrams	datagrams
 datagraph	datagraph
 DataGrip	DataGrip
 datalore	datalore
+DataFrame	DataFrame
 Datamation	Datamation
 Datamedia	Datamedia
 dataset	dataset
@@ -22433,6 +22436,7 @@ erythema	erythema
 erythrocyte	erythrocyte
 erythromycin	erythromycin
 eSATA	ESATA
+ESET	ESET
 esau	esau
 esbuild	esbuild
 esc	esc
@@ -25851,6 +25855,7 @@ foxglove	foxglove
 Foxhall	Foxhall
 foxhole	foxhole
 foxhound	foxhound
+Foxit	Foxit
 foxiness	foxiness
 foxmail	foxmail
 FoxPro	FoxPro
@@ -25863,6 +25868,7 @@ FPGA	FPGA
 FPS	FPS
 fpu	fpu
 fracas	fracas
+fractal	fractal
 fraction	fraction
 fractional	fractional
 fractionalise	fractionalise
@@ -26969,7 +26975,7 @@ gels	gels
 gem	gem
 gemara	gemara
 geminate	geminate
-gemini	gemini
+Gemini	Gemini
 Geminid	Geminid
 Gemma	Gemma
 gemmiparous	gemmiparous
@@ -28907,7 +28913,6 @@ hagiology	hagiology
 hagridden	hagridden
 Hagstrom	Hagstrom
 Hague	Hague
-haha	haha
 Hahn	Hahn
 Haifa	Haifa
 haiku	haiku
@@ -32444,6 +32449,7 @@ indetermination	indetermination
 index	index
 indexable	indexable
 indexed	indexed
+indexer	indexer
 indexes	indexes
 indexing	indexing
 India	India
@@ -35042,6 +35048,7 @@ junoesque	junoesque
 junta	junta
 junto	junto
 Jupiter	Jupiter
+Jupyter	Jupyter
 Jura	Jura
 Juras	Juras
 Jurassic	Jurassic
@@ -35166,6 +35173,7 @@ kart	kart
 kasbah	kasbah
 Kashmir	Kashmir
 Kaskaskia	Kaskaskia
+Kaspersky	Kaspersky
 kat	kat
 katabatic	katabatic
 Kate	Kate
@@ -39053,7 +39061,7 @@ master	master
 masterbating	masterbating
 masterbation	masterbation
 master boot record	masterbootrecord
-mastercard	mastercard
+Mastercard	Mastercard
 mastered	mastered
 masterful	masterful
 masterfully	masterfully
@@ -63666,7 +63674,7 @@ tenacity	tenacity
 tenancy	tenancy
 tenant	tenant
 tenants	tenants
-tencent	tencent
+Tencent	Tencent
 tench	tench
 tend	tend
 tended	tended
@@ -68322,6 +68330,8 @@ vaunting	vaunting
 vauxhall	vauxhall
 VAX	VAX
 VAXes	VAXes
+VBS	VBS
+VBScript	VBScript
 vbulletin	vbulletin
 vc	vc
 VCD	VCD

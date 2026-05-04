@@ -79,6 +79,9 @@ recognizer:
 # 快捷键
 key_binder:
   bindings:
+    # 翻页 - =
+    - { when: has_menu, accept: minus, send: Page_Up }
+    - { when: has_menu, accept: equal, send: Page_Down }
     # Tab / Shift+Tab 切换光标至下/上一个拼音
     #- { when: composing, accept: Shift+Tab, send: Shift+Left }
     #- { when: composing, accept: Tab, send: Shift+Right }
