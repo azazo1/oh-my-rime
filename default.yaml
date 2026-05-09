@@ -138,6 +138,10 @@ key_binder:
     - {accept: KP_Divide,   send: slash,    when: composing}
     - {accept: KP_Enter, send: Return, when: composing}
 
+    # 切换中英文
+    - { when: always, accept: Control+Shift+Alt+9, set_option: ascii_mode }
+    - { when: always, accept: Control+Shift+Alt+0, unset_option: ascii_mode }
+
 # 按键速查
 # https://github.com/LEOYoon-Tsaw/Rime_collections/blob/master/Rime_description.md
 # （没有 Command 键，不支持）
