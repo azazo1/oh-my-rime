@@ -50,6 +50,7 @@ switches:
 # 输入引擎
 engine:
   processors:
+    - lua_processor@*wanxiang.commit_code_switch
     - lua_processor@*wanxiang.super_processor   #KP小键盘、字母选词、符号快打、超强分词、重复限制、退格限制、声调回退、以词定字
     - lua_processor@*wanxiang.user_predict*P    #靠自己养的专属预测联想处理器，不再依赖前端插件以及固定数据
     - t9_processor                              #元书T9处理器
@@ -57,7 +58,6 @@ engine:
     - lua_processor@*wanxiang.super_sequence*P  #手动排序，高亮候选 ctrl+j左移动 ctrl+k 右移动 ctrl+l 移除位移  ctrl+p 置顶
     - ascii_composer                            #处理英文模式及中英文切换
     - recognizer                                #与 matcher 搭配，处理符合特定规则的输入码，如网址、反查等 tags
-    - lua_processor@*wanxiang.commit_code_switch #ascii_mode 切换前先上屏原始编码
     - key_binder                                #在特定条件下将按键绑定到其他按键，如重定义逗号、句号为候选翻页、开关快捷键等
     - lua_processor@*wanxiang.key_binder        #绑定按键扩展能力，支持正则扩展将按键生效情景更加细化
     - speller                                   #拼写处理器，接受字符按键，编辑输入
@@ -422,6 +422,8 @@ key_binder:
   # Lua 配置: shijian.lua 的引导符，涉及：日期、时间、节日、节气、生日、问候模板等功能
   shijian_keys: ["/", "6"]
   bindings:               # 也可以再增加方案专有的
+    - { when: always, accept: Shift_R, set_option: ascii_mode }
+    - { when: always, accept: Alt_R, unset_option: ascii_mode }
     - { when: has_menu, accept: 1, send: apostrophe }
 #当tab第一个字补码正确后，可以使用Ctrl+tab进行上屏并依次补码
     - { when: composing, accept: "Control+Tab", send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}' }

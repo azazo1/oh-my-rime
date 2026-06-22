@@ -2,6 +2,17 @@ local wanxiang = require("wanxiang/wanxiang")
 
 local M = {}
 
+local SPECIAL_KEYS = {
+    Shift_R = {
+        keycodes = { 0xffe2 },
+        reprs = { "Shift_R" },
+    },
+    Alt_R = {
+        keycodes = { 0xffea, 0xfe03, 0xff7e },
+        reprs = { "Alt_R", "Alt", "ISO_Level3_Shift", "Mode_switch" },
+    },
+}
+
 local function get_process_result(name)
     return wanxiang.RIME_PROCESS_RESULTS[name]
 end
@@ -39,6 +50,7 @@ local function parse_binding(map)
 
     return {
         accept = KeyEvent(accept),
+        accept_name = accept,
         action = action,
         when = get_string(map, "when") or "always",
     }
@@ -65,6 +77,32 @@ local function get_target_ascii_mode(binding, current)
     if binding.action == "set" then
         return true
     end
+    return false
+end
+
+local function key_matches(key_event, binding)
+    if key_event:eq(binding.accept) then
+        return true
+    end
+
+    local special = SPECIAL_KEYS[binding.accept_name]
+    if not special then
+        return false
+    end
+
+    local repr = key_event:repr() or ""
+    for _, keycode in ipairs(special.keycodes) do
+        if key_event.keycode == keycode then
+            return true
+        end
+    end
+
+    for _, key_repr in ipairs(special.reprs) do
+        if repr == key_repr then
+            return true
+        end
+    end
+
     return false
 end
 
@@ -111,7 +149,11 @@ function M.func(key_event, env)
     end
 
     for _, binding in ipairs(env.bindings) do
-        if key_event:eq(binding.accept) and should_run(binding, ctx) then
+        if key_matches(key_event, binding) and should_run(binding, ctx) then
+            if key_event:release() then
+                return get_process_result("kAccepted")
+            end
+
             local current = ctx:get_option("ascii_mode")
             local target = get_target_ascii_mode(binding, current)
             if target and not current and ctx:is_composing() then

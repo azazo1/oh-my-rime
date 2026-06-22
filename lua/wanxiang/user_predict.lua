@@ -669,7 +669,7 @@ function P.func(key, env)
     end
     
     if is_predicting then
-        local is_alt_key = (repr == "Tab" or repr == "Alt" or repr == "Alt_L" or repr == "Alt_R")
+        local is_alt_key = (repr == "Tab" or repr == "Alt" or repr == "Alt_L")
 
         -- 根据选词范围分流数字键
         if s_match(repr, "^[0-9]$") or s_match(repr, "^KP_[0-9]$") then
