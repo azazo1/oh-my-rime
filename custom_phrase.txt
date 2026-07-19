@@ -31,4 +31,5 @@ btw	btw	5
 vivado	vivado	5
 怎么	zmfe	5
 能	gn	5
-
+能不能	ngubng	5
+能不能	ngbugn	5
