@@ -33,3 +33,9 @@ vivado	vivado	5
 能	gn	5
 能不能	ngubng	5
 能不能	ngbugn	5
+这是什么	zuum	5
+是什么	uum	5
+这是什么	zsum	5
+是什么	sum	5
+这是什么	zusm	5
+是什么	usm	5
