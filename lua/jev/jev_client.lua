@@ -8,6 +8,7 @@
 
 local JSON = require('jev/jev_json')
 local DEFAULTS = require('jev/defaults')
+local PLATFORM = require('jev/jev_platform')
 
 local M = {}
 
@@ -16,8 +17,8 @@ M.queue_dir = DEFAULTS.queue_dir
 M.cache_dir = DEFAULTS.cache_dir
 M.log_dir = DEFAULTS.runtime_dir .. '/log'
 
--- Windows 下 os.execute 走 cmd.exe, 建目录与串联多条命令的写法都不同
-M.is_windows = package.config:sub(1, 1) == '\\'
+-- 平台判定与建目录写法都来自 jev_platform (与 sidecar 的 paths.py 同一套规则)
+M.is_windows = PLATFORM.is_windows
 
 local FNV_OFFSET = 0xcbf29ce484222325
 local FNV_PRIME = 0x100000001b3
@@ -110,7 +111,7 @@ end
 -- ---------------------------------------------------------------- 目录与队列
 
 function M.home_dir()
-    return os.getenv('HOME') or os.getenv('USERPROFILE') or '/tmp'
+    return PLATFORM.home_dir()
 end
 
 --- 切换运行时数据根目录 (来自 schema 的 jev_rerank/runtime_dir).

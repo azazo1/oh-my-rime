@@ -26,9 +26,7 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 def config(tmp_path: Path) -> Config:
     cfg = Config(
         backend="mock",
-        queue_dir=str(tmp_path / "queue"),
-        cache_dir=str(tmp_path / "cache"),
-        log_dir=str(tmp_path / "log"),
+        runtime_dir=str(tmp_path / "runtime"),
         poll_interval_ms=5,
         prefetch_max_age_ms=1500,
     )

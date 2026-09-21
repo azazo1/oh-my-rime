@@ -1,4 +1,4 @@
-"""命令行入口: serve / once / simulate / rerank / bench / health / patch-config."""
+"""命令行入口: serve / once / simulate / rerank / bench / health / paths / patch-config."""
 
 from __future__ import annotations
 
@@ -6,7 +6,10 @@ import argparse
 import json
 import os
 import random
+import re
+import shutil
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -14,7 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from . import __version__
+from . import __version__, paths
 from .backends import build_backend
 from .cache import DiskCache
 from .config import Config, dump_default_config, load_config
@@ -22,13 +25,16 @@ from .keys import PROMPT_VERSION, PROTOCOL_VERSION, cache_key, normalize_text
 from .logs import setup_logging
 from .rerank import Reranker
 from .rime_patch import (
-    DEFAULT_RIME_DIR,
+    BEGIN_MARK,
+    END_MARK,
     PatchError,
     apply_patch,
     default_snippet_path,
     remove_patch,
 )
 from .server import build_server
+
+RUNTIME_DIR_PATTERN = re.compile(r'^\s*runtime_dir:\s*"?([^"\n]+)"?\s*$', re.MULTILINE)
 
 _id_counter = 0
 
@@ -247,8 +253,94 @@ def cmd_init_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def _schema_runtime_dir(rime_dir: Path) -> str | None:
+    """从 wanxiang.custom.yaml 的 marker 块里读出实际写入的 runtime_dir."""
+    target = paths.schema_patch_target(rime_dir)
+    if not target.exists():
+        return None
+    text = target.read_text(encoding="utf-8")
+    begin = text.find(BEGIN_MARK)
+    end = text.find(END_MARK)
+    if begin < 0 or end < begin:
+        return None
+    match = RUNTIME_DIR_PATTERN.search(text[begin:end])
+    return match.group(1).strip() if match else None
+
+
+def cmd_paths(args: argparse.Namespace) -> int:
+    """打印按平台推导出的全部路径, 并核对 Rime 侧写的 runtime_dir 是否一致."""
+    payload = paths.as_dict(args.rime_dir)
+    schema_dir = _schema_runtime_dir(paths.resolve_rime_user_dir(args.rime_dir))
+    payload["schema_runtime_dir"] = schema_dir
+
+    mismatched = False
+    if schema_dir:
+        expected = Path(payload["runtime_dir"])
+        actual = Path(schema_dir.replace("~", str(Path.home()), 1)).expanduser()
+        matched = expected == actual
+        payload["runtime_dir_match"] = matched
+        mismatched = not matched
+    else:
+        payload["runtime_dir_match"] = None
+
+    payload["ok"] = not mismatched
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if mismatched:
+        print(
+            "两侧 runtime_dir 不一致: sidecar 用 "
+            f"{payload['runtime_dir']}, Rime 侧写的是 {schema_dir}; "
+            "重新执行 patch-config 或手工对齐",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def cmd_logs(args: argparse.Namespace) -> int:
+    config = _load_or_exit(args)
+    log_file = config.log_path / "sidecar.log"
+    if not log_file.exists():
+        print(f"还没有日志: {log_file}", file=sys.stderr)
+        return 1
+    lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+    for line in lines[-args.lines :]:
+        print(line)
+    return 0
+
+
+def cmd_deploy_rime(args: argparse.Namespace) -> int:
+    """各前端重新部署; 只做能确定的事情, 找不到工具时给出人话提示."""
+    platform = paths.platform_name()
+    if platform == "macos":
+        binary = Path("/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel")
+        if not binary.exists():
+            print(f"没找到鼠须管: {binary}", file=sys.stderr)
+            return 1
+        return subprocess.run([str(binary), "--reload"], check=False).returncode
+
+    if platform == "windows":
+        program_files = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+        deployers = sorted(program_files.glob("Rime/weasel-*/WeaselDeployer.exe"))
+        if not deployers:
+            print(
+                "没找到 WeaselDeployer.exe, 请用托盘菜单里的「重新部署」", file=sys.stderr
+            )
+            return 1
+        return subprocess.run([str(deployers[-1]), "/deploy"], check=False).returncode
+
+    remote = shutil.which("fcitx5-remote")
+    if remote:
+        return subprocess.run([remote, "-r"], check=False).returncode
+    print(
+        "Linux 上请用输入法菜单里的「重新部署」(fcitx5: 输入法配置 -> 附加组件 -> Rime -> 部署)",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def cmd_patch_config(args: argparse.Namespace) -> int:
-    target = Path(args.rime_dir).expanduser() / "wanxiang.custom.yaml"
+    rime_dir = paths.resolve_rime_user_dir(args.rime_dir)
+    target = paths.schema_patch_target(rime_dir)
     try:
         result = apply_patch(
             target,
@@ -262,11 +354,14 @@ def cmd_patch_config(args: argparse.Namespace) -> int:
         print(result.diff)
     prefix = "(dry-run, 未落盘) " if args.dry_run else ""
     print(prefix + result.summary())
+    if not args.dry_run:
+        print(f"写入的 runtime_dir: {paths.display_path(paths.default_runtime_dir())}")
     return 0
 
 
 def cmd_unpatch_config(args: argparse.Namespace) -> int:
-    target = Path(args.rime_dir).expanduser() / "wanxiang.custom.yaml"
+    rime_dir = paths.resolve_rime_user_dir(args.rime_dir)
+    target = paths.schema_patch_target(rime_dir)
     try:
         result = remove_patch(target, dry_run=args.dry_run)
     except PatchError as exc:
@@ -402,22 +497,31 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("health", help="查询 HTTP /health").set_defaults(func=cmd_health)
     sub.add_parser("init-config", help="写出默认配置文件").set_defaults(func=cmd_init_config)
     sub.add_parser("show-config", help="打印当前生效配置").set_defaults(func=cmd_show_config)
-    sub.add_parser("install-agent", help="安装 LaunchAgent 让 sidecar 常驻").set_defaults(
+    logs = sub.add_parser("logs", help="打印 sidecar 日志尾部")
+    logs.add_argument("--lines", type=int, default=60)
+    logs.set_defaults(func=cmd_logs)
+    sub.add_parser("deploy-rime", help="重新部署 Rime (按平台自动选择命令)").set_defaults(
+        func=cmd_deploy_rime
+    )
+    paths_parser = sub.add_parser("paths", help="打印按平台推导的路径并核对两侧 runtime_dir")
+    paths_parser.add_argument("--rime-dir", default=None, dest="rime_dir")
+    paths_parser.set_defaults(func=cmd_paths)
+    sub.add_parser("install-agent", help="安装 LaunchAgent 让 sidecar 常驻 (仅 macOS)").set_defaults(
         func=cmd_install_agent
     )
-    sub.add_parser("uninstall-agent", help="卸载 LaunchAgent").set_defaults(
+    sub.add_parser("uninstall-agent", help="卸载 LaunchAgent (仅 macOS)").set_defaults(
         func=cmd_uninstall_agent
     )
 
     patch = sub.add_parser("patch-config", help="把 jev-rerank 块写入 wanxiang.custom.yaml")
-    patch.add_argument("--rime-dir", default=str(DEFAULT_RIME_DIR), dest="rime_dir")
+    patch.add_argument("--rime-dir", default=None, dest="rime_dir")
     patch.add_argument("--snippet", default=None)
     patch.add_argument("--dry-run", action="store_true", dest="dry_run")
     patch.add_argument("--show-diff", action="store_true", dest="show_diff")
     patch.set_defaults(func=cmd_patch_config)
 
     unpatch = sub.add_parser("unpatch-config", help="从 wanxiang.custom.yaml 移除 jev-rerank 块")
-    unpatch.add_argument("--rime-dir", default=str(DEFAULT_RIME_DIR), dest="rime_dir")
+    unpatch.add_argument("--rime-dir", default=None, dest="rime_dir")
     unpatch.add_argument("--dry-run", action="store_true", dest="dry_run")
     unpatch.add_argument("--show-diff", action="store_true", dest="show_diff")
     unpatch.set_defaults(func=cmd_unpatch_config)
@@ -429,8 +533,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if not hasattr(args, "rime_dir"):
-        args.rime_dir = str(DEFAULT_RIME_DIR)
     try:
         return int(args.func(args))
     except KeyboardInterrupt:

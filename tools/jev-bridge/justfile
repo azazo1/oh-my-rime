@@ -35,12 +35,16 @@ health:
     uv run jev-bridge health
 
 # 打印最近日志
-logs:
-    tail -n 60 ~/Library/Caches/rime-jev/log/sidecar.log
+logs lines="60":
+    uv run jev-bridge logs --lines {{lines}}
 
 # 看当前生效配置
 config:
     uv run jev-bridge show-config
+
+# 打印按平台推导的全部路径, 并核对两侧 runtime_dir 是否一致
+paths:
+    uv run jev-bridge paths
 
 # 生成默认配置文件 (~/.config/rime-jev/config.toml)
 init-config:
@@ -70,16 +74,16 @@ unpatch-config:
 
 # 校验合并后的 custom 文件是合法 YAML 且 patch 段含关键项
 check-config:
-    uv run --with pyyaml python -c "import sys, json, yaml; d = yaml.safe_load(open(sys.argv[1], encoding='utf-8')); p = d.get('patch', {}); print(json.dumps({k: p[k] for k in p if 'jev' in k or 'filters' in k}, ensure_ascii=False, indent=2))" ~/Library/Rime/wanxiang.custom.yaml
+    uv run --with pyyaml python -c "import json, yaml; from jev_bridge import paths; target = paths.schema_patch_target(); d = yaml.safe_load(target.read_text(encoding='utf-8')); p = d.get('patch', {}); print(target); print(json.dumps({k: p[k] for k in p if 'jev' in k or 'filters' in k}, ensure_ascii=False, indent=2))"
 
-# 部署 Rime (鼠须管重新部署)
+# 部署 Rime (按平台自动选择命令: Squirrel / WeaselDeployer / fcitx5-remote)
 deploy-rime:
-    "/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel" --reload
+    uv run jev-bridge deploy-rime
 
-# 安装 LaunchAgent 让 sidecar 常驻
+# 安装 LaunchAgent 让 sidecar 常驻 (仅 macOS)
 install-agent:
     uv run jev-bridge install-agent
 
-# 卸载 LaunchAgent
+# 卸载 LaunchAgent (仅 macOS)
 uninstall-agent:
     uv run jev-bridge uninstall-agent

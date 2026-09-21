@@ -1,11 +1,11 @@
 # jev-bridge 配置示例
 # 复制到 ~/.config/rime-jev/config.toml 即可生效 (或用 `just init-config` 自动生成)
 # 每一项都能被同名环境变量覆盖: JEV_BACKEND / JEV_BASE_URL / JEV_MODEL / JEV_ALLOW_CLOUD /
-# JEV_HTTP_HOST / JEV_HTTP_PORT / JEV_LOG_LEVEL / JEV_DEBUG / TYPESAFE_API_KEY
+# JEV_RUNTIME_DIR / JEV_HTTP_HOST / JEV_HTTP_PORT / JEV_LOG_LEVEL / JEV_DEBUG / TYPESAFE_API_KEY
 # 改完执行 `just config` 看最终生效值, 重启 sidecar 才生效.
 
 # 配置结构版本, 升级由 config_migrations.py 负责, 不要手改
-config_version = 1
+config_version = 2
 
 # ---------------------------------------------------------------- 打分后端
 
@@ -23,13 +23,15 @@ api_key = ""
 allow_cloud = false
 
 # ---------------------------------------------------------------- 运行时目录
-# 必须与 Rime 侧 jev_rerank/runtime_dir 完全一致, 两侧靠这些目录交换数据
-# macOS:   ~/Library/Caches/rime-jev
-# Linux:   ~/.cache/rime-jev
-# Windows: %LOCALAPPDATA%\rime-jev (写成 C:/Users/<你>/AppData/Local/rime-jev, 用正斜杠)
-queue_dir = "~/Library/Caches/rime-jev/queue"
-cache_dir = "~/Library/Caches/rime-jev/cache"
-log_dir = "~/Library/Caches/rime-jev/log"
+
+# 队列/缓存/日志共同的父目录, 默认按平台自动推导, 通常不需要写:
+#   macOS   ~/Library/Caches/rime-jev
+#   Linux   $XDG_CACHE_HOME/rime-jev 或 ~/.cache/rime-jev
+#   Windows %LOCALAPPDATA%\rime-jev
+# 它必须与 Rime 侧 jev_rerank/runtime_dir 指向同一个根; 后者由 patch-config 按同一规则写进
+# wanxiang.custom.yaml, 想核对就执行 `just paths`.
+# runtime_dir = "~/.cache/rime-jev"       # 需要显式指定时解开这一行 (也可用 JEV_RUNTIME_DIR)
+# queue_dir / cache_dir / log_dir 不再单独配置, 固定是 <runtime_dir>/{queue,cache,log}
 
 # ---------------------------------------------------------------- 调试端点
 

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
-from . import config_migrations
+from . import config_migrations, paths
 
 CONFIG_VERSION = config_migrations.CURRENT_VERSION
 DEFAULT_CONFIG_PATH = Path(
@@ -30,9 +30,8 @@ class Config:
     api_key: str = ""
     allow_cloud: bool = False
 
-    queue_dir: str = "~/Library/Caches/rime-jev/queue"
-    cache_dir: str = "~/Library/Caches/rime-jev/cache"
-    log_dir: str = "~/Library/Caches/rime-jev/log"
+    # 队列/缓存/日志共同的父目录; 默认按平台推导, 一般不需要在配置里写
+    runtime_dir: str = field(default_factory=lambda: str(paths.default_runtime_dir()))
 
     http_host: str = "127.0.0.1"
     http_port: int = 20006
@@ -54,16 +53,20 @@ class Config:
     debug: bool = False
 
     @property
+    def runtime_path(self) -> Path:
+        return Path(self.runtime_dir).expanduser()
+
+    @property
     def queue_path(self) -> Path:
-        return Path(self.queue_dir).expanduser()
+        return self.runtime_path / "queue"
 
     @property
     def cache_path(self) -> Path:
-        return Path(self.cache_dir).expanduser()
+        return self.runtime_path / "cache"
 
     @property
     def log_path(self) -> Path:
-        return Path(self.log_dir).expanduser()
+        return self.runtime_path / "log"
 
     @property
     def backend_host(self) -> str:
@@ -100,6 +103,7 @@ def _env_overrides(config: Config) -> Config:
         "JEV_BACKEND": ("backend", str),
         "JEV_BASE_URL": ("base_url", str),
         "JEV_MODEL": ("model", str),
+        "JEV_RUNTIME_DIR": ("runtime_dir", str),
         "JEV_ALLOW_CLOUD": ("allow_cloud", _as_bool),
         "JEV_HTTP_HOST": ("http_host", str),
         "JEV_HTTP_PORT": ("http_port", int),
@@ -127,12 +131,7 @@ def load_config(path: Path | None = None) -> Config:
     if config_path.exists():
         with config_path.open("rb") as handle:
             raw = tomllib.load(handle)
-        unknown = set(raw) - {f.name for f in fields(Config)}
-        if unknown:
-            known = ", ".join(sorted(f.name for f in fields(Config)))
-            raise ConfigError(
-                f"{config_path} 存在未知配置项: {', '.join(sorted(unknown))}; 可用项: {known}"
-            )
+        # 未知项与版本检查都交给 migrate: 旧版本的字段需要先迁移掉
         config = config_migrations.migrate(raw)
     config = _env_overrides(config)
     config.validate()

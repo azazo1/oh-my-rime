@@ -65,7 +65,13 @@ function _G.assert_nil(value, label)
 end
 
 local script_dir = arg[0]:match('^(.*)/[^/]*$') or '.'
-for _, file in ipairs({ 'test_json.lua', 'test_client.lua', 'test_rerank.lua', 'test_filter.lua' }) do
+for _, file in ipairs({
+    'test_json.lua',
+    'test_client.lua',
+    'test_rerank.lua',
+    'test_platform.lua',
+    'test_filter.lua',
+}) do
     dofile(script_dir .. '/' .. file)
 end
 

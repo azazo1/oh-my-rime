@@ -8,15 +8,17 @@
 from __future__ import annotations
 
 import difflib
-import os
 import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import paths
+
 BEGIN_MARK = "# >>> jev-rerank begin (由 tools/jev-bridge 管理, 不要手改本块)"
 END_MARK = "# <<< jev-rerank end"
-DEFAULT_RIME_DIR = Path(os.environ.get("RIME_USER_DIR", "~/Library/Rime")).expanduser()
+# 片段里这个占位符在写入时替换成本机实际路径, 所以 Rime 侧不需要自己猜平台
+RUNTIME_DIR_PLACEHOLDER = "__JEV_RUNTIME_DIR__"
 
 
 class PatchError(Exception):
@@ -42,7 +44,13 @@ def default_snippet_path() -> Path:
 
 
 def default_backup_dir() -> Path:
-    return Path("~/Library/Caches/rime-jev/backup").expanduser()
+    return paths.default_runtime_dir() / "backup"
+
+
+def render_snippet(snippet: str, runtime_dir: Path | None = None) -> str:
+    """把片段里的占位符换成本机实际路径 (HOME 之下写成 ~ 形式, 便于跨机器复用)."""
+    target = runtime_dir or paths.default_runtime_dir()
+    return snippet.replace(RUNTIME_DIR_PLACEHOLDER, paths.display_path(target))
 
 
 def _read(path: Path) -> str:
@@ -136,10 +144,13 @@ def apply_patch(
     snippet_path: Path | None = None,
     dry_run: bool = False,
     backup_dir: Path | None = None,
+    runtime_dir: Path | None = None,
 ) -> PatchResult:
     if not target.exists():
         raise PatchError(f"目标文件不存在: {target}")
-    snippet = _read(snippet_path or default_snippet_path())
+    snippet = render_snippet(
+        _read(snippet_path or default_snippet_path()), runtime_dir=runtime_dir
+    )
     original = _read(target)
     stripped, _ = _strip_block(original)
     updated = _compose(stripped, snippet)

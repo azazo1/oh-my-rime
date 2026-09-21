@@ -112,21 +112,59 @@ uv sync
 uv run jev-bridge serve          # 或 uv run jev-bridge once 只处理一轮
 ```
 
-需要按平台改的只有三处:
+**路径不用手填**, 全部按平台自动推导, 两侧用的是同一套规则:
 
-| 项目 | macOS | Linux | Windows |
-| --- | --- | --- | --- |
-| sidecar 运行时目录 (`config.toml` 的 `queue_dir`/`cache_dir`/`log_dir`) | `~/Library/Caches/rime-jev/...` | `~/.cache/rime-jev/...` | `C:/Users/<你>/AppData/Local/rime-jev/...` |
-| Rime 侧同一根目录 (schema 的 `jev_rerank/runtime_dir`) | `~/Library/Caches/rime-jev` | `~/.cache/rime-jev` | `C:/Users/<你>/AppData/Local/rime-jev` |
-| Rime 用户目录 (`just patch-config` 的 `--rime-dir`, 或环境变量 `RIME_USER_DIR`) | `~/Library/Rime` | fcitx5: `~/.local/share/fcitx5/rime`, ibus: `~/.config/ibus/rime` | `%APPDATA%\Rime` |
+| 需要的东西 | 推导规则 |
+| --- | --- |
+| sidecar 的队列/缓存/日志 | `<runtime_dir>/{queue,cache,log}`, `runtime_dir` 默认 macOS `~/Library/Caches/rime-jev`, Linux `$XDG_CACHE_HOME/rime-jev` 或 `~/.cache/rime-jev`, Windows `%LOCALAPPDATA%\rime-jev` |
+| Rime 侧的 `jev_rerank/runtime_dir` | `patch-config` 按同一规则算好后**写进** `wanxiang.custom.yaml` (HOME 之下写成 `~/...`, 换机器仍可用), Rime 侧不需要自己猜平台 |
+| Rime 用户目录 | macOS `~/Library/Rime`; Linux 依次找 `~/.local/share/fcitx5/rime`, `~/.config/ibus/rime`, `~/.local/share/fcitx/rime`; Windows `%APPDATA%\Rime` |
 
-两侧的目录必须一致, 这是 Lua 与 sidecar 交换数据的唯一通道; Lua 侧 `runtime_dir` 支持 `~` 展开,
-Windows 下建目录会自动换成 `cmd.exe` 的写法, 不需要额外处理。
+只有想覆盖默认值时才需要动手: 环境变量 `JEV_RUNTIME_DIR` / `RIME_USER_DIR`, schema 里的 `jev_rerank/runtime_dir`,
+或 `patch-config --rime-dir`。`just paths` 会打印推导结果, 并核对两侧 runtime_dir 是否一致 (不一致时非零退出)。
+
+Lua 侧 `runtime_dir` 支持 `~` 展开, Windows 下建目录会自动换成 `cmd.exe` 的写法, 不需要额外处理。
 
 平台专属的部分只有 **常驻方式**: `just install-agent` 用的是 launchd (macOS)。
 Linux 直接抄 `systemd/jev-bridge.service` (文件末尾写了安装命令), Windows 用计划任务或 `nssm`,
 内容都是同一条 `jev-bridge serve`;
 不装常驻服务时前台运行也完全可用, sidecar 不在线时过滤器只花 0.2ms 跳过, 不影响打字。
+
+### Windows 上怎么真正用上 Jev
+
+`localjev-mlx` / `laya-mlx` 走的是 Apple MLX, **Windows 上没有本地后端可用**, 所以 Windows 只有云端一条路
+(或任何自己实现 `POST /v1/systemone` 的服务)。需要改的就三行:
+
+```toml
+# %USERPROFILE%\.config\rime-jev\config.toml
+backend = "http"
+base_url = "https://api.typesafe.ai"     # 官方; 也可换成自建的同协议服务
+model = "jev-latest"
+allow_cloud = true                        # 必须显式打开, 云端会收到你正在输入的上文
+```
+
+api_key 建议走环境变量而不是写进文件: PowerShell 里 `$env:TYPESAFE_API_KEY = "..."`,
+要持久化就 `setx TYPESAFE_API_KEY "..."` (重开终端生效)。
+
+schema 侧的 `jev_rerank/mode` 要改成 `async` (或把 `timeout_ms` 压到 10 左右): 云端延迟 70-500ms,
+`sync` 只会让每次按键白等一个超时。async 的代价是首次输入某个编码看不到重排, 同一个编码第二次出现时才生效。
+
+链路本身与平台无关, sidecar 每次按键做的事就是发这样一次请求, 再按返回的概率重排候选:
+
+```json
+POST https://api.typesafe.ai/v1/systemone
+{
+  "state": {"context": "今天天气不错", "input": "nihao",
+            "candidates": [{"id": "0", "text": "你好"}, {"id": "1", "text": "尼豪"}, {"id": "2", "text": "拟好"}]},
+  "model": "jev-latest",
+  "questions": {"best_continuation": {"type": "choice",
+      "instructions": "...choose which candidate the user most likely intends...",
+      "criteria": {"0": "你好", "1": "尼豪", "2": "拟好"}}}
+}
+```
+
+返回 `answers.best_continuation.probabilities` 与 `confidence`; 置信度或首选概率不达门限就保持原顺序,
+只加 `AI` 标记。
 
 ## 排障
 

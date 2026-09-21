@@ -6,13 +6,16 @@ from pathlib import Path
 
 import pytest
 
+from jev_bridge import paths
 from jev_bridge.rime_patch import (
     BEGIN_MARK,
     END_MARK,
+    RUNTIME_DIR_PLACEHOLDER,
     PatchError,
     apply_patch,
     default_snippet_path,
     remove_patch,
+    render_snippet,
 )
 
 SAMPLE = """# 用户自己的注释
@@ -91,6 +94,22 @@ def test_fails_on_unpaired_marker(tmp_path: Path) -> None:
     path.write_text(f"patch:\n  a: 1\n{BEGIN_MARK}\n", encoding="utf-8")
     with pytest.raises(PatchError):
         apply_patch(path, backup_dir=tmp_path / "backup")
+
+
+def test_snippet_placeholder_becomes_platform_path(custom_file: Path, tmp_path: Path) -> None:
+    """片段里的占位符要在写入时换成本机路径, Rime 侧就不必自己猜平台."""
+    apply_patch(custom_file, backup_dir=tmp_path / "backup")
+    text = custom_file.read_text(encoding="utf-8")
+    assert RUNTIME_DIR_PLACEHOLDER not in text
+    assert f'runtime_dir: "{paths.display_path(paths.default_runtime_dir())}"' in text
+
+
+def test_render_snippet_expands_home(tmp_path: Path) -> None:
+    rendered = render_snippet(f'runtime_dir: "{RUNTIME_DIR_PLACEHOLDER}"', tmp_path / "x")
+    assert rendered == f'runtime_dir: "{tmp_path}/x"'
+    # HOME 之下的路径写成 ~ 形式, 换机器仍然可用
+    rendered = render_snippet(RUNTIME_DIR_PLACEHOLDER, paths.home_dir() / "y")
+    assert rendered == "~/y"
 
 
 def test_snippet_is_indented_for_patch_mapping() -> None:
