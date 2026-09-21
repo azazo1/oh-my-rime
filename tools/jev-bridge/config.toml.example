@@ -14,8 +14,8 @@ config_version = 2
 backend = "mock"
 
 # 本机 Laya (localjev-mlx / laya-mlx) 或云端 TypeSafe Jev
-# 注意: 这里的端口要和后端自己监听的端口一致 (localjev-mlx 默认是 8090, 需要它对齐到 20007)
-base_url = "http://127.0.0.1:20007"
+# 端口必须与后端自己监听的端口一致: localjev-mlx 默认就是 8090, 自建服务按实际情况改这一行
+base_url = "http://127.0.0.1:8090"
 model = "laya-multilingual"
 api_key = ""
 

@@ -25,8 +25,8 @@ def test_default_http_port() -> None:
 
 
 def test_default_backend_port() -> None:
-    """Laya 后端默认在 20007 (需要后端自己监听同一端口)."""
-    assert Config().base_url == "http://127.0.0.1:20007"
+    """Laya 后端按 localjev-mlx 的默认端口 8090; 调试端点是另一个 (20006)."""
+    assert Config().base_url == "http://127.0.0.1:8090"
 
 
 def test_example_matches_builtin_defaults(monkeypatch) -> None:

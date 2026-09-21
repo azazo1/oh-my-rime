@@ -25,7 +25,7 @@ class ConfigError(Exception):
 class Config:
     config_version: int = CONFIG_VERSION
     backend: str = "mock"
-    base_url: str = "http://127.0.0.1:20007"
+    base_url: str = "http://127.0.0.1:8090"
     model: str = "laya-multilingual"
     api_key: str = ""
     allow_cloud: bool = False

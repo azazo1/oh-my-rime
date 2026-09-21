@@ -63,11 +63,11 @@ just deploy-rime                              # 鼠须管重新部署
 | schema 的 `jev_rerank:` 段 (由补丁写进 `wanxiang.custom.yaml`) | 开关行为: mode, 等待预算, 候选上限, 上下文长度, 标记文本, 方案白名单 |
 
 调试端点默认在 `http://127.0.0.1:20006` (`http_host` / `http_port`), 打字路径不经过它;
-`base_url` 里的端口是**后端自己监听**的端口 (默认按 `20007` 写), 与 sidecar 的调试端口 `20006` 无关;
-用 localjev-mlx 时要么把它的监听端口改成 20007, 要么把这里的 `base_url` 改成它的默认 8090。
+`base_url` 里的端口是**后端自己监听**的端口 (默认 `8090`, 与 localjev-mlx 的默认值一致),
+和 sidecar 的调试端口 `20006` 是两件事。
 
 `config.toml` 的所有项都能被同名环境变量覆盖: `JEV_BACKEND`, `JEV_BASE_URL`, `JEV_MODEL`,
-`JEV_ALLOW_CLOUD`, `JEV_HTTP_HOST`, `JEV_HTTP_PORT`, `JEV_LOG_LEVEL`, `JEV_DEBUG`, `TYPESAFE_API_KEY`。
+`JEV_ALLOW_CLOUD`, `JEV_RUNTIME_DIR`, `JEV_HTTP_HOST`, `JEV_HTTP_PORT`, `JEV_LOG_LEVEL`, `JEV_DEBUG`, `TYPESAFE_API_KEY`。
 用 `just config` 看最终生效值. 配置带 `config_version`, 升级走 `config_migrations.py`, 不做隐式兼容.
 
 ### 后端
@@ -75,7 +75,7 @@ just deploy-rime                              # 鼠须管重新部署
 | backend | 说明 | 延迟感受 |
 | --- | --- | --- |
 | `mock` | 零依赖, 确定性规则造分, 只用于验证链路 | 微秒级 |
-| `http` + `http://127.0.0.1:20007` | localjev-mlx / laya-mlx (Laya 权重 + MLX), 本机推理 | M3 Max 上 P50 7-14ms, M1 上需实测 |
+| `http` + `http://127.0.0.1:8090` | localjev-mlx / laya-mlx (Laya 权重 + MLX), 本机推理 | M3 Max 上 P50 7-14ms, M1 上需实测 |
 | `http` + `https://api.typesafe.ai` | 官方 Jev 云端, 需要 key | 70-500ms, 只能 async |
 
 云端后端会把上文送出本机, 因此 `base_url` 指向非本机地址时**必须显式** `allow_cloud = true`,
