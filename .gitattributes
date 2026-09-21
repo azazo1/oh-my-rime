@@ -1,0 +1,13 @@
+# 仓库内文本文件统一使用 LF 行尾, 检出和提交时都不做 CRLF 转换
+* text=auto eol=lf
+
+# 二进制文件明确排除行尾处理
+*.bin binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.gram binary
+*.db binary
