@@ -1,0 +1,85 @@
+# just recipe 集合: jev-bridge 的开发与日常操作
+# 用法示例写在每个 recipe 上方的注释里, 最后一行是 just --list 显示的简介.
+
+[private]
+default:
+    @just --list
+
+# 安装依赖并创建 .venv (首次使用)
+install:
+    uv sync --extra dev
+
+# 跑全部测试 (Python + Lua 纯逻辑)
+test:
+    uv run pytest
+    lua tests/lua/run.lua "{{justfile_directory()}}/../.." /tmp/jev-lua-suite
+
+# 只跑 Python 测试
+test-py:
+    uv run pytest
+
+# 只跑 Lua 侧测试
+test-lua:
+    lua tests/lua/run.lua "{{justfile_directory()}}/../.." /tmp/jev-lua-suite
+
+# 前台启动 sidecar (调试用, Ctrl-C 退出)
+run *args:
+    uv run jev-bridge serve {{args}}
+
+# 处理一次积压队列后退出
+once:
+    uv run jev-bridge once
+
+# 查询本地 HTTP 健康状态
+health:
+    uv run jev-bridge health
+
+# 打印最近日志
+logs:
+    tail -n 60 ~/Library/Caches/rime-jev/log/sidecar.log
+
+# 看当前生效配置
+config:
+    uv run jev-bridge show-config
+
+# 生成默认配置文件 (~/.config/rime-jev/config.toml)
+init-config:
+    uv run jev-bridge init-config
+
+# 投递一个请求并等待响应, 用来在不打字的情况下验证整条链路
+# 例: just simulate nihao "今天天气"
+simulate code context="":
+    uv run jev-bridge simulate --code "{{code}}" --context "{{context}}" --timeout-ms 3000
+
+# 延迟基准 (默认走当前后端, 冷缓存)
+# 例: just bench 20
+bench count="20":
+    uv run jev-bridge bench --count {{count}}
+
+# 预览 config 补丁会改成什么 (不改文件)
+patch-dry:
+    uv run jev-bridge patch-config --dry-run --show-diff
+
+# 把 jev-rerank 块写进 wanxiang.custom.yaml
+patch-config:
+    uv run jev-bridge patch-config --show-diff
+
+# 从 wanxiang.custom.yaml 里移除 jev-rerank 块
+unpatch-config:
+    uv run jev-bridge unpatch-config --show-diff
+
+# 校验合并后的 custom 文件是合法 YAML 且 patch 段含关键项
+check-config:
+    uv run --with pyyaml python -c "import sys, json, yaml; d = yaml.safe_load(open(sys.argv[1], encoding='utf-8')); p = d.get('patch', {}); print(json.dumps({k: p[k] for k in p if 'jev' in k or 'filters' in k}, ensure_ascii=False, indent=2))" ~/Library/Rime/wanxiang.custom.yaml
+
+# 部署 Rime (鼠须管重新部署)
+deploy-rime:
+    "/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel" --reload
+
+# 安装 LaunchAgent 让 sidecar 常驻
+install-agent:
+    uv run jev-bridge install-agent
+
+# 卸载 LaunchAgent
+uninstall-agent:
+    uv run jev-bridge uninstall-agent

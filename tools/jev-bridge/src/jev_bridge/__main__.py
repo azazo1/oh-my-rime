@@ -1,0 +1,441 @@
+"""命令行入口: serve / once / simulate / rerank / bench / health / patch-config."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import random
+import signal
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+from . import __version__
+from .backends import build_backend
+from .cache import DiskCache
+from .config import Config, dump_default_config, load_config
+from .keys import PROMPT_VERSION, PROTOCOL_VERSION, cache_key, normalize_text
+from .logs import setup_logging
+from .rerank import Reranker
+from .rime_patch import (
+    DEFAULT_RIME_DIR,
+    PatchError,
+    apply_patch,
+    default_snippet_path,
+    remove_patch,
+)
+from .server import build_server
+
+_id_counter = 0
+
+
+def _new_id() -> str:
+    """与 Lua 侧同构的请求 id: 时间 + 计数 + 随机, 保证按时间大致有序."""
+    global _id_counter
+    _id_counter += 1
+    return f"{int(time.time()):x}{_id_counter % 0x1000000:06x}{random.randint(0, 0xFFFF):04x}"
+
+
+def _build_request(args: argparse.Namespace, config: Config) -> dict:
+    texts = [text for text in (args.candidates or "").split(",") if text]
+    if not texts:
+        texts = ["你好", "尼豪", "你", "拟好"]
+    candidates = [{"index": i, "text": text} for i, text in enumerate(texts)]
+    context = args.context or ""
+    mock_probabilities = None
+    if getattr(args, "mock_probabilities", None):
+        mock_probabilities = {}
+        for pair in args.mock_probabilities.split(","):
+            key, _, value = pair.partition(":")
+            mock_probabilities[key.strip()] = float(value)
+    key = cache_key(args.schema_id, args.code, context, texts, PROMPT_VERSION)
+    return {
+        "v": PROTOCOL_VERSION,
+        "id": _new_id(),
+        "ts": time.time(),
+        "mode": args.mode,
+        "schema_id": args.schema_id,
+        "code": args.code,
+        "context": context,
+        "candidates": candidates,
+        "question": {
+            "name": "best_continuation",
+            "type": "choice",
+            "instructions": (
+                "Given the text the user has already typed (context) and the code being "
+                "typed, which candidate is most likely intended next? "
+                "Prefer the candidate that fits the context naturally."
+            ),
+            "criteria": {str(i): text for i, text in enumerate(texts)},
+        },
+        "prompt_version": PROMPT_VERSION,
+        "cache_key": key,
+        "badge": config.badge,
+        "show_confidence": config.show_confidence,
+        "mock_probabilities": mock_probabilities,
+    }
+
+
+def _load_or_exit(args: argparse.Namespace) -> Config:
+    try:
+        return load_config(Path(args.config) if args.config else None)
+    except Exception as exc:  # noqa: BLE001 - CLI 顶层需要友好报错
+        print(f"配置读取失败: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+
+# --------------------------------------------------------------------- 子命令
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    config = _load_or_exit(args)
+    config.ensure_dirs()
+    setup_logging(config.log_path, config.log_level, config.debug)
+    import logging
+
+    log = logging.getLogger("jev_bridge")
+    log.info("jev-bridge %s 启动", __version__)
+    log.info(
+        "配置: backend=%s base_url=%s model=%s allow_cloud=%s 队列=%s",
+        config.backend,
+        config.base_url,
+        config.model,
+        config.allow_cloud,
+        config.queue_path,
+    )
+    cache = DiskCache(config.cache_path, config.cache_ttl_s, config.cache_max_entries)
+    bridge = build_server(config, cache)
+    bridge.start()
+    stop_event = threading.Event()
+
+    def _stop(signum, _frame):
+        log.info("收到信号 %s, 准备退出", signum)
+        stop_event.set()
+
+    signal.signal(signal.SIGINT, _stop)
+    signal.signal(signal.SIGTERM, _stop)
+    try:
+        bridge.worker.run_forever(stop_event)
+    finally:
+        bridge.stop()
+        log.info("缓存统计: %s", json.dumps(cache.stats.as_dict(), ensure_ascii=False))
+    return 0
+
+
+def cmd_once(args: argparse.Namespace) -> int:
+    config = _load_or_exit(args)
+    config.ensure_dirs()
+    setup_logging(config.log_path, config.log_level, config.debug)
+    cache = DiskCache(config.cache_path, config.cache_ttl_s, config.cache_max_entries)
+    bridge = build_server(config, cache)
+    processed = bridge.worker.tick()
+    print(
+        json.dumps(
+            {
+                "processed_groups": processed,
+                "queue": bridge.worker.stats.as_dict(),
+                "cache": cache.stats.as_dict(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def cmd_simulate(args: argparse.Namespace) -> int:
+    """按 Lua 侧同样的格式投递一个请求并等待响应, 用于不打字就验证整条链路."""
+    config = _load_or_exit(args)
+    config.ensure_dirs()
+    setup_logging(config.log_path, config.log_level, config.debug)
+    request = _build_request(args, config)
+    if not request.get("mock_probabilities"):
+        request.pop("mock_probabilities", None)
+    if getattr(args, "mock_error", None):
+        request["mock_error"] = args.mock_error
+    queue_dir = config.queue_path
+    req_path = queue_dir / f"{request['id']}.req.json"
+    res_path = queue_dir / f"{request['id']}.res.json"
+    tmp = req_path.with_name(f"{req_path.name}.tmp")
+    tmp.write_text(json.dumps(request, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(req_path)
+    deadline = time.time() + args.timeout_ms / 1000
+    while time.time() < deadline:
+        if res_path.exists():
+            payload = json.loads(res_path.read_text(encoding="utf-8"))
+            res_path.unlink(missing_ok=True)
+            req_path.unlink(missing_ok=True)
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0 if payload.get("ok") else 1
+        time.sleep(0.005)
+    print(f"等待响应超时 ({args.timeout_ms}ms), 请求仍在队列: {req_path}", file=sys.stderr)
+    return 2
+
+
+def cmd_rerank(args: argparse.Namespace) -> int:
+    config = _load_or_exit(args)
+    config.ensure_dirs()
+    setup_logging(config.log_path, config.log_level, config.debug)
+    raw = sys.stdin.read() if args.request in (None, "-") else Path(args.request).read_text("utf-8")
+    request = json.loads(raw)
+    cache = DiskCache(config.cache_path, config.cache_ttl_s, config.cache_max_entries)
+    reranker = Reranker(config, cache, build_backend(config))
+    print(json.dumps(reranker.handle(request), ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_bench(args: argparse.Namespace) -> int:
+    config = _load_or_exit(args)
+    config.ensure_dirs()
+    setup_logging(config.log_path, config.log_level, config.debug)
+    cache = DiskCache(config.cache_path, config.cache_ttl_s, config.cache_max_entries)
+    backend = build_backend(config)
+    reranker = Reranker(config, cache, backend)
+    latencies: list[float] = []
+    for index in range(args.count):
+        args.context = f"第 {index} 次基准测试的上文"
+        args.code = f"code{index}"
+        request = _build_request(args, config)
+        request.pop("mock_probabilities", None)
+        started = time.perf_counter()
+        response = reranker.handle(request)
+        latencies.append((time.perf_counter() - started) * 1000)
+        if not response.get("ok"):
+            print(f"第 {index} 次失败: {response.get('error')}", file=sys.stderr)
+    latencies.sort()
+    if not latencies:
+        return 1
+
+    def _pct(p: float) -> float:
+        return round(latencies[min(len(latencies) - 1, int(len(latencies) * p))], 2)
+
+    print(
+        json.dumps(
+            {
+                "backend": backend.name,
+                "count": len(latencies),
+                "p50_ms": _pct(0.50),
+                "p95_ms": _pct(0.95),
+                "max_ms": round(latencies[-1], 2),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def cmd_health(args: argparse.Namespace) -> int:
+    config = _load_or_exit(args)
+    url = f"http://{config.http_host}:{config.http_port}/health"
+    try:
+        with urllib.request.urlopen(url, timeout=3) as response:
+            print(json.dumps(json.loads(response.read().decode("utf-8")), ensure_ascii=False, indent=2))
+        return 0
+    except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+        print(f"健康检查失败 ({url}): {exc}", file=sys.stderr)
+        return 1
+
+
+def cmd_init_config(args: argparse.Namespace) -> int:
+    path = dump_default_config(Path(args.config) if args.config else None)
+    print(f"配置模板: {path}")
+    return 0
+
+
+def cmd_patch_config(args: argparse.Namespace) -> int:
+    target = Path(args.rime_dir).expanduser() / "wanxiang.custom.yaml"
+    try:
+        result = apply_patch(
+            target,
+            Path(args.snippet) if args.snippet else default_snippet_path(),
+            dry_run=args.dry_run,
+        )
+    except PatchError as exc:
+        print(f"补丁失败: {exc}", file=sys.stderr)
+        return 2
+    if result.diff and (args.dry_run or args.show_diff):
+        print(result.diff)
+    prefix = "(dry-run, 未落盘) " if args.dry_run else ""
+    print(prefix + result.summary())
+    return 0
+
+
+def cmd_unpatch_config(args: argparse.Namespace) -> int:
+    target = Path(args.rime_dir).expanduser() / "wanxiang.custom.yaml"
+    try:
+        result = remove_patch(target, dry_run=args.dry_run)
+    except PatchError as exc:
+        print(f"移除失败: {exc}", file=sys.stderr)
+        return 2
+    if result.diff and (args.dry_run or args.show_diff):
+        print(result.diff)
+    prefix = "(dry-run, 未落盘) " if args.dry_run else ""
+    print(prefix + result.summary())
+    return 0
+
+
+def cmd_version(_args: argparse.Namespace) -> int:
+    print(__version__)
+    return 0
+
+
+def cmd_show_config(args: argparse.Namespace) -> int:
+    """打印当前生效配置, 便于确认 env 覆盖是否按预期生效."""
+    from .config import DEFAULT_CONFIG_PATH, as_dict
+
+    config = _load_or_exit(args)
+    payload = as_dict(config)
+    payload["api_key"] = "***" if payload.get("api_key") else ""
+    print(
+        json.dumps(
+            {
+                "config_path": str(Path(args.config) if args.config else DEFAULT_CONFIG_PATH),
+                "config_exists": (Path(args.config) if args.config else DEFAULT_CONFIG_PATH).exists(),
+                "is_cloud": config.is_cloud,
+                "effective": payload,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+# --------------------------------------------------------------------- LaunchAgent
+
+LAUNCH_AGENT_LABEL = "ai.rime.jev-bridge"
+LAUNCH_AGENT_PATH = Path("~/Library/LaunchAgents/ai.rime.jev-bridge.plist").expanduser()
+PLIST_TEMPLATE = Path(__file__).resolve().parents[2] / "launchd" / "ai.rime.jev-bridge.plist"
+
+
+def _render_plist(config: Config) -> str:
+    binary = Path(sys.prefix) / "bin" / "jev-bridge"
+    if not binary.exists():
+        binary = Path(sys.executable).parent / "jev-bridge"
+    template = PLIST_TEMPLATE.read_text(encoding="utf-8")
+    return (
+        template.replace("@VENV_BIN@", str(binary))
+        .replace("@LOG_DIR@", str(config.log_path))
+    )
+
+
+def cmd_install_agent(args: argparse.Namespace) -> int:
+    import subprocess
+
+    config = _load_or_exit(args)
+    config.ensure_dirs()
+    LAUNCH_AGENT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LAUNCH_AGENT_PATH.write_text(_render_plist(config), encoding="utf-8")
+    domain = f"gui/{os.getuid()}"
+    subprocess.run(
+        ["launchctl", "bootout", domain, str(LAUNCH_AGENT_PATH)], check=False
+    )
+    result = subprocess.run(
+        ["launchctl", "bootstrap", domain, str(LAUNCH_AGENT_PATH)], check=False
+    )
+    if result.returncode != 0:
+        result = subprocess.run(
+            ["launchctl", "load", "-w", str(LAUNCH_AGENT_PATH)], check=False
+        )
+    if result.returncode != 0:
+        print("launchctl 注册失败, 请手工检查上面的输出", file=sys.stderr)
+        return result.returncode
+    print(f"已安装 LaunchAgent: {LAUNCH_AGENT_PATH} (日志 {config.log_path}/sidecar.log)")
+    return 0
+
+
+def cmd_uninstall_agent(_args: argparse.Namespace) -> int:
+    import subprocess
+
+    domain = f"gui/{os.getuid()}"
+    subprocess.run(["launchctl", "bootout", domain, str(LAUNCH_AGENT_PATH)], check=False)
+    if LAUNCH_AGENT_PATH.exists():
+        LAUNCH_AGENT_PATH.unlink()
+    print(f"已移除 LaunchAgent: {LAUNCH_AGENT_PATH}")
+    return 0
+
+
+# --------------------------------------------------------------------- 解析
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="jev-bridge", description="Rime 万象拼音的 typed-decision 候选重排服务"
+    )
+    parser.add_argument("--config", help="配置文件路径, 默认 ~/.config/rime-jev/config.toml")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("serve", help="常驻运行: 队列监听 + HTTP 调试端点").set_defaults(func=cmd_serve)
+    sub.add_parser("once", help="只处理一次队列里待办的请求").set_defaults(func=cmd_once)
+
+    simulate = sub.add_parser("simulate", help="按 Lua 的格式投递请求并等待响应")
+    simulate.add_argument("--code", default="nihao")
+    simulate.add_argument("--context", default="")
+    simulate.add_argument("--candidates", default="")
+    simulate.add_argument("--schema-id", default="wanxiang", dest="schema_id")
+    simulate.add_argument("--mode", default="sync", choices=["sync", "prefetch"])
+    simulate.add_argument("--timeout-ms", type=int, default=3000, dest="timeout_ms")
+    simulate.add_argument(
+        "--mock-probabilities", default=None, dest="mock_probabilities", help="形如 0:0.1,1:0.9"
+    )
+    simulate.add_argument("--mock-error", default=None, dest="mock_error")
+    simulate.set_defaults(func=cmd_simulate)
+
+    rerank = sub.add_parser("rerank", help="直接跑一次打分 (不走队列)")
+    rerank.add_argument("--request", default="-", help="请求 JSON 文件, 默认读标准输入")
+    rerank.set_defaults(func=cmd_rerank)
+
+    bench = sub.add_parser("bench", help="延迟基准 (默认冷缓存, 每次不同上文)")
+    bench.add_argument("--count", type=int, default=20)
+    bench.add_argument("--code", default="nihao")
+    bench.add_argument("--context", default="")
+    bench.add_argument("--candidates", default="")
+    bench.add_argument("--schema-id", default="wanxiang", dest="schema_id")
+    bench.add_argument("--mode", default="sync", choices=["sync", "prefetch"])
+    bench.set_defaults(func=cmd_bench)
+
+    sub.add_parser("health", help="查询 HTTP /health").set_defaults(func=cmd_health)
+    sub.add_parser("init-config", help="写出默认配置文件").set_defaults(func=cmd_init_config)
+    sub.add_parser("show-config", help="打印当前生效配置").set_defaults(func=cmd_show_config)
+    sub.add_parser("install-agent", help="安装 LaunchAgent 让 sidecar 常驻").set_defaults(
+        func=cmd_install_agent
+    )
+    sub.add_parser("uninstall-agent", help="卸载 LaunchAgent").set_defaults(
+        func=cmd_uninstall_agent
+    )
+
+    patch = sub.add_parser("patch-config", help="把 jev-rerank 块写入 wanxiang.custom.yaml")
+    patch.add_argument("--rime-dir", default=str(DEFAULT_RIME_DIR), dest="rime_dir")
+    patch.add_argument("--snippet", default=None)
+    patch.add_argument("--dry-run", action="store_true", dest="dry_run")
+    patch.add_argument("--show-diff", action="store_true", dest="show_diff")
+    patch.set_defaults(func=cmd_patch_config)
+
+    unpatch = sub.add_parser("unpatch-config", help="从 wanxiang.custom.yaml 移除 jev-rerank 块")
+    unpatch.add_argument("--rime-dir", default=str(DEFAULT_RIME_DIR), dest="rime_dir")
+    unpatch.add_argument("--dry-run", action="store_true", dest="dry_run")
+    unpatch.add_argument("--show-diff", action="store_true", dest="show_diff")
+    unpatch.set_defaults(func=cmd_unpatch_config)
+
+    sub.add_parser("version", help="打印版本").set_defaults(func=cmd_version)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not hasattr(args, "rime_dir"):
+        args.rime_dir = str(DEFAULT_RIME_DIR)
+    try:
+        return int(args.func(args))
+    except KeyboardInterrupt:
+        return 130
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

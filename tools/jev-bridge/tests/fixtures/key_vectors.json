@@ -1,0 +1,83 @@
+[
+  {
+    "name": "基础",
+    "schema_id": "wanxiang",
+    "code": "nihao",
+    "context": "今天天气不错",
+    "candidates": ["你好", "尼豪", "拟好"],
+    "prompt_version": 1,
+    "cache_key": "974dd64b9c57bd42"
+  },
+  {
+    "name": "空上文",
+    "schema_id": "wanxiang",
+    "code": "wo",
+    "context": "",
+    "candidates": ["我", "握"],
+    "prompt_version": 1,
+    "cache_key": "48e024b4c34e6846"
+  },
+  {
+    "name": "编码大小写与空格",
+    "schema_id": "wanxiang",
+    "code": " Ni Hao ",
+    "context": "我们",
+    "candidates": ["你好"],
+    "prompt_version": 1,
+    "cache_key": "6e9cc62081be879b"
+  },
+  {
+    "name": "上文含换行制表符",
+    "schema_id": "wanxiang",
+    "code": "shijian",
+    "context": "第一行\n第二行\t结尾",
+    "candidates": ["时间", "实践"],
+    "prompt_version": 1,
+    "cache_key": "1c4f5a47a5444cdf"
+  },
+  {
+    "name": "上文首尾空格",
+    "schema_id": "wanxiang",
+    "code": "ceshi",
+    "context": "  前面 后面  ",
+    "candidates": ["测试", "侧视"],
+    "prompt_version": 1,
+    "cache_key": "24b6067c070e675b"
+  },
+  {
+    "name": "候选文本含空白",
+    "schema_id": "wanxiang",
+    "code": "abc",
+    "context": "x",
+    "candidates": ["a\tb", "c\nd"],
+    "prompt_version": 1,
+    "cache_key": "70c94be4a4abbc6b"
+  },
+  {
+    "name": "英文方案",
+    "schema_id": "wanxiang_english",
+    "code": "hello",
+    "context": "say ",
+    "candidates": ["hello", "helo", "hell"],
+    "prompt_version": 1,
+    "cache_key": "13f84ecd38f7cef7"
+  },
+  {
+    "name": "八个候选",
+    "schema_id": "wanxiang",
+    "code": "zhongguo",
+    "context": "我爱",
+    "candidates": ["中国", "种过", "中过", "重过", "终果", "中果", "忠国", "钟国"],
+    "prompt_version": 1,
+    "cache_key": "01cd4fc34c7be581"
+  },
+  {
+    "name": "版本号参与哈希",
+    "schema_id": "wanxiang",
+    "code": "nihao",
+    "context": "今天天气不错",
+    "candidates": ["你好", "尼豪", "拟好"],
+    "prompt_version": 2,
+    "cache_key": "ded555ee17489ac1"
+  }
+]

@@ -1,0 +1,31 @@
+  # ---------------------------------------------------------------------------
+  # AI 候选重排 (Jev / Laya typed-decision): 由 tools/jev-bridge 提供, 详见其 README
+  # 过滤器追加在万象全部过滤器之后: 只改候选顺序与首位候选的注释, 不增删候选
+  # ---------------------------------------------------------------------------
+  "engine/filters/+":
+    - lua_filter@*jev.jev_filter
+
+  # AI开关: Control+Shift+J 切换; 想在状态面板里记住它, 把 jev_rerank 加进
+  # default.yaml 的 switcher/save_options
+  "switches/+":
+    - name: jev_rerank
+      states: [ AI关, AI开 ]
+      reset: 1
+
+  "key_binder/bindings/+":
+    - { when: always, accept: Control+Shift+J, toggle: jev_rerank }
+
+  jev_rerank:
+    mode: sync               # sync (有界等待, 适合本机后端) | async (只读缓存 + 预取, 适合云端)
+    timeout_ms: 60           # 仅 sync 模式生效, 超时即原序放行
+    prefetch: true           # 未命中时投递预取请求, 结果供下一次刷新使用
+    prefetch_debounce_ms: 80 # 预取去抖, 避免每个按键都发一次
+    max_candidates: 8        # 参与重排的候选个数上限
+    min_code_len: 2          # 编码长度低于它就跳过
+    context_chars: 30        # 送给模型的上文尾部字符数 (同时决定缓存键)
+    context_buffer_chars: 120
+    badge: "AI"              # 追加到首位候选注释的标记, 置空则不加
+    show_confidence: false   # 标记里是否带上置信度百分比
+    schemas: [wanxiang, wanxiang_pro]
+    debug: false             # true 时把跳过原因写进 ~/Library/Caches/rime-jev/log/lua.log
+    # instructions: "..."    # 需要自定义提问措辞时解开注释 (默认见 lua/jev/defaults.lua)

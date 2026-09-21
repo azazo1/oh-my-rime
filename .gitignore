@@ -13,3 +13,9 @@ user.yaml
 wanxiang-lts-zh-hans.gram
 *.custom.yaml
 !others/**/*.custom.yaml
+
+# jev-bridge: AI 候选重排 sidecar 的本地产物 (运行时数据在 ~/Library/Caches/rime-jev)
+tools/jev-bridge/.venv/
+tools/jev-bridge/**/__pycache__/
+tools/jev-bridge/.pytest_cache/
+lua/jev/state/
