@@ -3,7 +3,7 @@
 -- 这里出现的数值必须与 tools/jev-bridge/src/jev_bridge/{keys,config}.py 保持一致,
 -- 否则缓存键或门限会在两侧分叉 (sidecar 会在日志里报 "缓存键不一致").
 
-local HOME = os.getenv('HOME') or '/tmp'
+local HOME = os.getenv('HOME') or os.getenv('USERPROFILE') or '/tmp'
 
 local M = {}
 
@@ -11,7 +11,11 @@ local M = {}
 M.protocol_version = 1
 M.prompt_version = 1
 
--- 运行时数据目录 (仓库之外, 不进版本控制)
+-- 运行时数据目录 (仓库之外, 不进版本控制).
+-- 必须与 sidecar 的 queue_dir/cache_dir/log_dir 指向同一个根, 两侧靠这些目录交换数据.
+-- 换平台时在 schema 的 jev_rerank/runtime_dir 里覆盖即可, 例如:
+--   Linux:   ~/.cache/rime-jev
+--   Windows: C:/Users/<你>/AppData/Local/rime-jev
 M.runtime_dir = HOME .. '/Library/Caches/rime-jev'
 M.queue_dir = M.runtime_dir .. '/queue'
 M.cache_dir = M.runtime_dir .. '/cache'

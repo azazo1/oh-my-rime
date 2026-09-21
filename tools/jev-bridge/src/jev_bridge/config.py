@@ -14,44 +14,7 @@ DEFAULT_CONFIG_PATH = Path(
     os.environ.get("JEV_CONFIG", "~/.config/rime-jev/config.toml")
 ).expanduser()
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0"}
-
-_TEMPLATE = """# jev-bridge 配置
-# 改完执行: just restart
-config_version = 1
-
-# 后端: mock (零依赖, 只验证链路) | http (Jev 兼容的 /v1/systemone)
-backend = "mock"
-base_url = "http://127.0.0.1:8090"
-model = "laya-multilingual"
-api_key = ""
-# 云端后端会把上文送出本机, 必须显式置为 true 才允许访问非本机地址
-allow_cloud = false
-
-queue_dir = "~/Library/Caches/rime-jev/queue"
-cache_dir = "~/Library/Caches/rime-jev/cache"
-log_dir = "~/Library/Caches/rime-jev/log"
-
-http_host = "127.0.0.1"
-http_port = 8091
-
-poll_interval_ms = 15
-# 预取请求超过这个年龄就直接丢弃 (用户早就换词了, 算出来也没用)
-prefetch_max_age_ms = 1500
-backend_timeout_ms = 800
-
-cache_ttl_s = 600
-cache_max_entries = 2000
-
-max_candidates = 8
-# 候选顺序变化的最小置信度门限, 低于它就保持原顺序
-min_confidence = 0.5
-min_top_prob = 0.34
-badge = "AI"
-show_confidence = false
-
-log_level = "INFO"
-debug = false
-"""
+EXAMPLE_FILE_NAME = "config.toml.example"
 
 
 class ConfigError(Exception):
@@ -62,7 +25,7 @@ class ConfigError(Exception):
 class Config:
     config_version: int = CONFIG_VERSION
     backend: str = "mock"
-    base_url: str = "http://127.0.0.1:8090"
+    base_url: str = "http://127.0.0.1:20007"
     model: str = "laya-multilingual"
     api_key: str = ""
     allow_cloud: bool = False
@@ -72,9 +35,9 @@ class Config:
     log_dir: str = "~/Library/Caches/rime-jev/log"
 
     http_host: str = "127.0.0.1"
-    http_port: int = 8091
+    http_port: int = 20006
 
-    poll_interval_ms: int = 15
+    poll_interval_ms: int = 5
     prefetch_max_age_ms: int = 1500
     backend_timeout_ms: int = 800
 
@@ -131,9 +94,6 @@ class Config:
         for path in (self.queue_path, self.cache_path, self.log_path):
             path.mkdir(parents=True, exist_ok=True)
 
-    def to_template(self) -> str:
-        return _TEMPLATE
-
 
 def _env_overrides(config: Config) -> Config:
     env_map = {
@@ -179,13 +139,24 @@ def load_config(path: Path | None = None) -> Config:
     return config
 
 
+def example_config_path() -> Path:
+    """仓库里的示例配置, 也是 `jev-bridge init-config` 的唯一来源."""
+    return Path(__file__).resolve().parents[2] / EXAMPLE_FILE_NAME
+
+
 def dump_default_config(path: Path | None = None) -> Path:
-    """写出默认配置模板 (已存在则不覆盖)."""
+    """把示例配置复制成用户配置 (已存在则不覆盖)."""
     config_path = (path or DEFAULT_CONFIG_PATH).expanduser()
+    if config_path.exists():
+        return config_path
+    example = example_config_path()
+    if not example.exists():
+        raise ConfigError(
+            f"找不到示例配置 {example}; 请在 tools/jev-bridge 目录下运行, 或手工创建 {config_path}"
+        )
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    if not config_path.exists():
-        config_path.write_text(_TEMPLATE, encoding="utf-8")
-        config_path.chmod(0o600)
+    config_path.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+    config_path.chmod(0o600)
     return config_path
 
 

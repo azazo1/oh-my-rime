@@ -14,6 +14,39 @@ local function write_file(path, text)
     handle:close()
 end
 
+test('set_runtime_dir 覆盖队列与缓存目录并支持 ~ 与结尾斜杠', function()
+    local home = CLIENT.home_dir()
+
+    assert_true(CLIENT.set_runtime_dir(home .. '/.cache/rime-jev'))
+    assert_eq(home .. '/.cache/rime-jev/queue', CLIENT.queue_dir)
+    assert_eq(home .. '/.cache/rime-jev/cache', CLIENT.cache_dir)
+    assert_eq(home .. '/.cache/rime-jev/log', CLIENT.log_dir)
+
+    assert_true(CLIENT.set_runtime_dir('~/x/'))
+    assert_eq(home .. '/x/queue', CLIENT.queue_dir)
+    assert_true(CLIENT.set_runtime_dir('C:\\tmp\\rime-jev'))
+    assert_eq('C:/tmp/rime-jev/cache', CLIENT.cache_dir)
+
+    assert_true(not CLIENT.set_runtime_dir(''))
+    assert_true(not CLIENT.set_runtime_dir(nil))
+
+    -- 还原到测试沙箱: 后面的用例全靠它
+    assert_true(CLIENT.set_runtime_dir(RUNTIME_DIR))
+    assert_eq(RUNTIME_DIR .. '/queue', CLIENT.queue_dir)
+end)
+
+test('dir_command 按平台给出正确的建目录命令', function()
+    local original = CLIENT.is_windows
+    CLIENT.is_windows = false
+    assert_eq('mkdir -p "/tmp/rime-jev"', CLIENT.dir_command('/tmp/rime-jev'))
+    CLIENT.is_windows = true
+    assert_eq(
+        'if not exist "C:\\tmp\\rime-jev" mkdir "C:\\tmp\\rime-jev"',
+        CLIENT.dir_command('C:/tmp/rime-jev')
+    )
+    CLIENT.is_windows = original
+end)
+
 test('fnv1a64 标准向量', function()
     assert_eq('cbf29ce484222325', CLIENT.fnv1a64_hex(''))
     assert_eq('af63dc4c8601ec8c', CLIENT.fnv1a64_hex('a'))

@@ -10,6 +10,10 @@ end
 
 local function make_config(overrides)
     local values = overrides or {}
+    -- runtime_dir 必须存在且指向测试沙箱: 过滤器 init 会用它覆盖 CLIENT 的目录
+    if values.runtime_dir == nil then
+        values.runtime_dir = RUNTIME_DIR
+    end
     return {
         get_string = function(_, path)
             local key = path:gsub('^jev_rerank/', '')

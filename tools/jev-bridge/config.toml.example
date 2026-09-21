@@ -1,0 +1,66 @@
+# jev-bridge 配置示例
+# 复制到 ~/.config/rime-jev/config.toml 即可生效 (或用 `just init-config` 自动生成)
+# 每一项都能被同名环境变量覆盖: JEV_BACKEND / JEV_BASE_URL / JEV_MODEL / JEV_ALLOW_CLOUD /
+# JEV_HTTP_HOST / JEV_HTTP_PORT / JEV_LOG_LEVEL / JEV_DEBUG / TYPESAFE_API_KEY
+# 改完执行 `just config` 看最终生效值, 重启 sidecar 才生效.
+
+# 配置结构版本, 升级由 config_migrations.py 负责, 不要手改
+config_version = 1
+
+# ---------------------------------------------------------------- 打分后端
+
+# mock: 零依赖的确定性规则, 只用于验证链路 (排序质量不代表真实模型)
+# http: Jev 兼容的 POST /v1/systemone
+backend = "mock"
+
+# 本机 Laya (localjev-mlx / laya-mlx) 或云端 TypeSafe Jev
+# 注意: 这里的端口要和后端自己监听的端口一致 (localjev-mlx 默认是 8090, 需要它对齐到 20007)
+base_url = "http://127.0.0.1:20007"
+model = "laya-multilingual"
+api_key = ""
+
+# 云端后端会把上文送出本机, 必须显式置为 true 才允许访问非本机地址
+allow_cloud = false
+
+# ---------------------------------------------------------------- 运行时目录
+# 必须与 Rime 侧 jev_rerank/runtime_dir 完全一致, 两侧靠这些目录交换数据
+# macOS:   ~/Library/Caches/rime-jev
+# Linux:   ~/.cache/rime-jev
+# Windows: %LOCALAPPDATA%\rime-jev (写成 C:/Users/<你>/AppData/Local/rime-jev, 用正斜杠)
+queue_dir = "~/Library/Caches/rime-jev/queue"
+cache_dir = "~/Library/Caches/rime-jev/cache"
+log_dir = "~/Library/Caches/rime-jev/log"
+
+# ---------------------------------------------------------------- 调试端点
+
+# 只用于 curl 调试与手工联调, 打字路径走文件队列
+http_host = "127.0.0.1"
+http_port = 20006
+
+# ---------------------------------------------------------------- 队列
+
+# 轮询间隔, 越小 sync 模式越快, 代价是空转更频繁
+poll_interval_ms = 5
+# 预取请求超过这个年龄就直接丢弃 (用户早就换词了, 算出来也没用)
+prefetch_max_age_ms = 1500
+# 单次后端调用的超时
+backend_timeout_ms = 800
+
+# ---------------------------------------------------------------- 缓存
+
+cache_ttl_s = 600
+cache_max_entries = 2000
+
+# ---------------------------------------------------------------- 重排规则
+
+max_candidates = 8
+# 置信度与首选概率双门限, 任一不达标就保持原顺序
+min_confidence = 0.5
+min_top_prob = 0.34
+badge = "AI"
+show_confidence = false
+
+# ---------------------------------------------------------------- 日志
+
+log_level = "INFO"
+debug = false

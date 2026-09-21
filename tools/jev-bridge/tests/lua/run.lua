@@ -20,14 +20,15 @@ package.path = table.concat({
 local JSON = require('jev/jev_json')
 local CLIENT = require('jev/jev_client')
 
-CLIENT.queue_dir = tmp_dir .. '/queue'
-CLIENT.cache_dir = tmp_dir .. '/cache'
-CLIENT.log_dir = tmp_dir .. '/log'
-
+-- 所有测试都在这个沙箱根目录下跑: 过滤器的 init 会按配置调用 set_runtime_dir,
+-- 所以测试里的 runtime_dir 必须指向同一个根, 否则请求会被写到真实用户目录去.
+local runtime_root = tmp_dir .. '/runtime'
 os.execute('rm -rf "' .. tmp_dir .. '" && mkdir -p "' .. tmp_dir .. '"')
+CLIENT.set_runtime_dir(runtime_root)
 
 _G.RIME_DIR = rime_dir
 _G.TMP_DIR = tmp_dir
+_G.RUNTIME_DIR = runtime_root
 _G.FIXTURE_PATH = rime_dir .. '/tools/jev-bridge/tests/fixtures/key_vectors.json'
 _G.JSON = JSON
 _G.CLIENT = CLIENT

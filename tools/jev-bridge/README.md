@@ -23,7 +23,7 @@ tools/jev-bridge (本项目)
   rerank.py    概率 -> 顺序的映射与门限 (置信度, 首选概率)
   cache.py     TTL + LRU 磁盘缓存
   backends/    mock | http (Jev 兼容的 /v1/systemone: localjev-mlx 或 api.typesafe.ai)
-  server.py    http://127.0.0.1:8091/health  仅用于调试
+  server.py    http://127.0.0.1:20006/health  仅用于调试
 ```
 
 运行数据全部在仓库之外: `~/Library/Caches/rime-jev/{queue,cache,log,backup}`。
@@ -33,7 +33,7 @@ tools/jev-bridge (本项目)
 ```shell
 cd ~/Library/Rime/tools/jev-bridge
 just install              # uv sync, 建 .venv
-just init-config          # 生成 ~/.config/rime-jev/config.toml (默认 backend = mock)
+just init-config          # 把 config.toml.example 复制成 ~/.config/rime-jev/config.toml
 just run                  # 前台跑 sidecar, 保持这个终端开着
 ```
 
@@ -58,11 +58,16 @@ just deploy-rime                              # 鼠须管重新部署
 
 | 位置 | 管什么 |
 | --- | --- |
-| `~/.config/rime-jev/config.toml` | 后端地址, 队列/缓存/端口, 超时, 缓存 TTL, 门限, 日志级别 |
+| `config.toml.example` | 仓库里的示例配置, 每一项都带注释, 也是 `just init-config` 的唯一来源 |
+| `~/.config/rime-jev/config.toml` | 实际生效的配置: 后端地址, 队列/缓存/端口, 超时, 缓存 TTL, 门限, 日志级别 |
 | schema 的 `jev_rerank:` 段 (由补丁写进 `wanxiang.custom.yaml`) | 开关行为: mode, 等待预算, 候选上限, 上下文长度, 标记文本, 方案白名单 |
 
+调试端点默认在 `http://127.0.0.1:20006` (`http_host` / `http_port`), 打字路径不经过它;
+`base_url` 里的端口是**后端自己监听**的端口 (默认按 `20007` 写), 与 sidecar 的调试端口 `20006` 无关;
+用 localjev-mlx 时要么把它的监听端口改成 20007, 要么把这里的 `base_url` 改成它的默认 8090。
+
 `config.toml` 的所有项都能被同名环境变量覆盖: `JEV_BACKEND`, `JEV_BASE_URL`, `JEV_MODEL`,
-`JEV_ALLOW_CLOUD`, `JEV_HTTP_PORT`, `JEV_LOG_LEVEL`, `JEV_DEBUG`, `TYPESAFE_API_KEY`。
+`JEV_ALLOW_CLOUD`, `JEV_HTTP_HOST`, `JEV_HTTP_PORT`, `JEV_LOG_LEVEL`, `JEV_DEBUG`, `TYPESAFE_API_KEY`。
 用 `just config` 看最终生效值. 配置带 `config_version`, 升级走 `config_migrations.py`, 不做隐式兼容.
 
 ### 后端
@@ -70,7 +75,7 @@ just deploy-rime                              # 鼠须管重新部署
 | backend | 说明 | 延迟感受 |
 | --- | --- | --- |
 | `mock` | 零依赖, 确定性规则造分, 只用于验证链路 | 微秒级 |
-| `http` + `http://127.0.0.1:8090` | localjev-mlx (Laya 权重 + MLX), 本机推理 | M3 Max 上 P50 7-14ms, M1 上需实测 |
+| `http` + `http://127.0.0.1:20007` | localjev-mlx / laya-mlx (Laya 权重 + MLX), 本机推理 | M3 Max 上 P50 7-14ms, M1 上需实测 |
 | `http` + `https://api.typesafe.ai` | 官方 Jev 云端, 需要 key | 70-500ms, 只能 async |
 
 云端后端会把上文送出本机, 因此 `base_url` 指向非本机地址时**必须显式** `allow_cloud = true`,
@@ -93,9 +98,35 @@ just logs            # 看 sidecar 日志
 just bench 20        # 延迟基准 (当前后端, 冷缓存)
 just patch-config    # 写入 Rime 配置补丁
 just unpatch-config  # 移除补丁
-just deploy-rime     # 鼠须管重新部署
-just install-agent   # 可选: 装成 LaunchAgent 常驻 (写 ~/Library/LaunchAgents)
+just deploy-rime     # 鼠须管重新部署 (仅 macOS)
+just install-agent   # 可选: 装成 LaunchAgent 常驻 (仅 macOS, 写 ~/Library/LaunchAgents)
 ```
+
+## Windows / Linux
+
+sidecar 是纯 Python 标准库实现 (Python 3.12+), 三个平台都能直接前台启动, 不需要编译:
+
+```shell
+git clone <本仓库> && cd <本仓库>/tools/jev-bridge
+uv sync
+uv run jev-bridge serve          # 或 uv run jev-bridge once 只处理一轮
+```
+
+需要按平台改的只有三处:
+
+| 项目 | macOS | Linux | Windows |
+| --- | --- | --- | --- |
+| sidecar 运行时目录 (`config.toml` 的 `queue_dir`/`cache_dir`/`log_dir`) | `~/Library/Caches/rime-jev/...` | `~/.cache/rime-jev/...` | `C:/Users/<你>/AppData/Local/rime-jev/...` |
+| Rime 侧同一根目录 (schema 的 `jev_rerank/runtime_dir`) | `~/Library/Caches/rime-jev` | `~/.cache/rime-jev` | `C:/Users/<你>/AppData/Local/rime-jev` |
+| Rime 用户目录 (`just patch-config` 的 `--rime-dir`, 或环境变量 `RIME_USER_DIR`) | `~/Library/Rime` | fcitx5: `~/.local/share/fcitx5/rime`, ibus: `~/.config/ibus/rime` | `%APPDATA%\Rime` |
+
+两侧的目录必须一致, 这是 Lua 与 sidecar 交换数据的唯一通道; Lua 侧 `runtime_dir` 支持 `~` 展开,
+Windows 下建目录会自动换成 `cmd.exe` 的写法, 不需要额外处理。
+
+平台专属的部分只有 **常驻方式**: `just install-agent` 用的是 launchd (macOS)。
+Linux 直接抄 `systemd/jev-bridge.service` (文件末尾写了安装命令), Windows 用计划任务或 `nssm`,
+内容都是同一条 `jev-bridge serve`;
+不装常驻服务时前台运行也完全可用, sidecar 不在线时过滤器只花 0.2ms 跳过, 不影响打字。
 
 ## 排障
 

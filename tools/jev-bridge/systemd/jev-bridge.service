@@ -1,0 +1,28 @@
+[Unit]
+Description=jev-bridge sidecar (typed-decision candidate rerank for Rime)
+Documentation=file:///%h/Library/Rime/tools/jev-bridge/README.md
+After=default.target
+
+[Service]
+Type=simple
+# 路径按实际情况改: 下面假设配置仓库在 ~/rime-config, 并且已在 tools/jev-bridge 里跑过 uv sync
+WorkingDirectory=%h/rime-config/tools/jev-bridge
+ExecStart=%h/rime-config/tools/jev-bridge/.venv/bin/jev-bridge serve
+# Rime 用户目录 (patch-config 用得到), fcitx5 与 ibus 二选一
+Environment=RIME_USER_DIR=%h/.local/share/fcitx5/rime
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+
+# 安装:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/jev-bridge.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now jev-bridge
+# 查看:
+#   systemctl --user status jev-bridge
+#   journalctl --user -u jev-bridge -f
+# 卸载:
+#   systemctl --user disable --now jev-bridge && rm ~/.config/systemd/user/jev-bridge.service

@@ -11,9 +11,13 @@ local DEFAULTS = require('jev/defaults')
 
 local M = {}
 
+M.runtime_dir = DEFAULTS.runtime_dir
 M.queue_dir = DEFAULTS.queue_dir
 M.cache_dir = DEFAULTS.cache_dir
 M.log_dir = DEFAULTS.runtime_dir .. '/log'
+
+-- Windows 下 os.execute 走 cmd.exe, 建目录与串联多条命令的写法都不同
+M.is_windows = package.config:sub(1, 1) == '\\'
 
 local FNV_OFFSET = 0xcbf29ce484222325
 local FNV_PRIME = 0x100000001b3
@@ -105,16 +109,54 @@ end
 
 -- ---------------------------------------------------------------- 目录与队列
 
+function M.home_dir()
+    return os.getenv('HOME') or os.getenv('USERPROFILE') or '/tmp'
+end
+
+--- 切换运行时数据根目录 (来自 schema 的 jev_rerank/runtime_dir).
+-- 支持开头的 ~ 展开与正反斜杠混用; 换目录后下次 ensure_dirs 会重新建目录.
+function M.set_runtime_dir(directory)
+    if not directory or directory == '' then
+        return false
+    end
+    local normalized = directory:gsub('\\', '/')
+    if normalized:sub(1, 1) == '~' then
+        normalized = M.home_dir() .. normalized:sub(2)
+    end
+    normalized = normalized:gsub('/+$', '')
+    if normalized == '' then
+        return false
+    end
+    M.runtime_dir = normalized
+    M.queue_dir = normalized .. '/queue'
+    M.cache_dir = normalized .. '/cache'
+    M.log_dir = normalized .. '/log'
+    dirs_ready = false
+    return true
+end
+
+--- 单条建目录命令: Windows 的 cmd.exe 不认 mkdir -p, 也不建议用正斜杠.
+function M.dir_command(path)
+    if M.is_windows then
+        local windows_path = path:gsub('/', '\\')
+        return string.format('if not exist "%s" mkdir "%s"', windows_path, windows_path)
+    end
+    return string.format('mkdir -p "%s"', path)
+end
+
 --- 建立运行时目录. 即使失败也只尝试一次, 避免每次按键都 fork 一个 shell.
 function M.ensure_dirs()
     if dirs_ready then return true end
     dirs_ready = true
-    local command = string.format(
-        'mkdir -p "%s" "%s" "%s" 2>/dev/null',
-        M.queue_dir,
-        M.cache_dir,
-        M.log_dir
-    )
+    local joiner = M.is_windows and ' & ' or ' && '
+    local command = table.concat({
+        M.dir_command(M.queue_dir),
+        M.dir_command(M.cache_dir),
+        M.dir_command(M.log_dir),
+    }, joiner)
+    if not M.is_windows then
+        command = command .. ' 2>/dev/null'
+    end
     local ok = os.execute(command)
     if ok == nil or ok == false then
         return false

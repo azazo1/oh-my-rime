@@ -16,6 +16,9 @@
     - { when: always, accept: Control+Shift+J, toggle: jev_rerank }
 
   jev_rerank:
+    # 运行时目录: 必须与 sidecar config.toml 的 queue_dir/cache_dir/log_dir 同一根
+    # macOS 用下面这行; Linux 换成 "~/.cache/rime-jev"; Windows 用 "C:/Users/<你>/AppData/Local/rime-jev"
+    runtime_dir: "~/Library/Caches/rime-jev"
     mode: sync               # sync (有界等待, 适合本机后端) | async (只读缓存 + 预取, 适合云端)
     timeout_ms: 60           # 仅 sync 模式生效, 超时即原序放行
     prefetch: true           # 未命中时投递预取请求, 结果供下一次刷新使用

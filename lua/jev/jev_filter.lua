@@ -80,6 +80,8 @@ local function read_config(schema_config)
 
     config.badge = get_string('badge') or config.badge
     config.instructions = get_string('instructions') or config.instructions
+    -- 换平台 (Linux/Windows) 时用它覆盖默认的 macOS 缓存目录, 必须与 sidecar config.toml 对齐
+    config.runtime_dir = get_string('runtime_dir') or config.runtime_dir
 
     local schemas = {}
     local ok, list = pcall(function()
@@ -247,6 +249,7 @@ function M.init(env)
             context = '',
             last_submit_ms = nil,
         }
+        CLIENT.set_runtime_dir(config.runtime_dir)
         CLIENT.ensure_dirs()
         env.jev.commit_conn = env.engine.context.commit_notifier:connect(function(ctx)
             local committed, commit_error = pcall(on_commit, env, ctx)
