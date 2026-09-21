@@ -97,20 +97,9 @@ local function translator(input, seg, env)
         return
     end
 
-    -- 方案映射表
+    -- 方案映射表: 本仓库只保留小鹤双拼, 其他双拼定义已从 wanxiang_algebra.yaml 移除
     local schema_map = {
         ["/flypy"] = "小鹤双拼",
-        ["/mspy"] = "微软双拼",
-        ["/zrm"] = "自然码",
-        ["/sogou"] = "搜狗双拼",
-        ["/znabc"] = "智能ABC",
-        ["/ziguang"] = "紫光双拼",
-        ["/pyjj"] = "拼音加加",
-        ["/gbpy"] = "国标双拼",
-        ["/lxsq"] = "乱序17",
-        ["/zrlong"] = "自然龙",
-        ["/hxlong"] = "汉心龙",
-        ["/pinyin"] = "全拼",
     }
 
     local target_schema = schema_map[input]
