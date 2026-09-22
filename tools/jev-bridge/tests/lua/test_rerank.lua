@@ -85,6 +85,38 @@ test('apply_order 回填到原位置且不动的候选保持不动', function()
     assert_eq('尼豪', candidates[4].text)
 end)
 
+test('annotate_scores 标注概率并给模型首选打星', function()
+    local candidates = make_candidates({ '你好', '尼豪', '拟好' })
+    local positions = { 1, 2, 3 }
+    local scores = { ['0'] = 0.8712, ['1'] = 0.0834, ['2'] = 0.0454 }
+    assert_eq(3, RERANK.annotate_scores(candidates, positions, scores, 0))
+    assert_eq('★87%', candidates[1].comment)
+    assert_eq('8%', candidates[2].comment)
+    assert_eq('5%', candidates[3].comment)
+    assert_eq('你好', candidates[1].text, '对比模式不该改顺序')
+
+    -- 模型首选在第三位时星星落在第三位: 一眼看出词库把它排后面了
+    local other = make_candidates({ '你好', '尼豪', '拟好' })
+    RERANK.annotate_scores(other, positions, { ['0'] = 0.1, ['1'] = 0.2, ['2'] = 0.7 }, 2)
+    assert_eq('10%', other[1].comment)
+    assert_eq('★70%', other[3].comment)
+end)
+
+test('annotate_scores 保留原注释且不重复追加', function()
+    local candidates = make_candidates({ '你好', '尼豪' })
+    candidates[1].comment = '〔user〕'
+    RERANK.annotate_scores(candidates, { 1, 2 }, { ['0'] = 0.9, ['1'] = 0.1 }, 0)
+    assert_eq('〔user〕 ★90%', candidates[1].comment)
+    RERANK.annotate_scores(candidates, { 1, 2 }, { ['0'] = 0.9, ['1'] = 0.1 }, 0)
+    assert_eq('〔user〕 ★90%', candidates[1].comment)
+
+    -- 缺概率的槽位跳过, 不写空注释
+    local partial = make_candidates({ '你好', '尼豪' })
+    assert_eq(1, RERANK.annotate_scores(partial, { 1, 2 }, { ['0'] = 0.9 }, 0))
+    assert_eq('', partial[2].comment)
+    assert_eq(0, RERANK.annotate_scores(partial, { 1, 2 }, nil, 0))
+end)
+
 test('apply_badge 追加一次且不覆盖已有注释', function()
     local candidates = make_candidates({ '你好', '尼豪' })
     candidates[1].comment = '〔user〕'

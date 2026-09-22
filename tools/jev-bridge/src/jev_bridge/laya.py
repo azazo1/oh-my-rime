@@ -234,7 +234,7 @@ def run_foreground(
     print(
         f"前台启动 localjev-mlx: 端口 {port}, 权重缓存 {hf_cache_dir()}\n"
         f"  {' '.join(python_bin)}\n"
-        "  首次启动要下载权重, /health 变 200 之前输入法侧会走原序放行。Ctrl-C 退出。",
+        "  首次启动要下载权重, /health 变 200 之前输入法侧会走原序放行. Ctrl-C 退出.",
         file=sys.stderr,
         flush=True,
     )

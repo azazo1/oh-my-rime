@@ -50,6 +50,7 @@ local function make_env(options)
         input = opts.input or 'nihao',
         get_option = function(_, name)
             if name == 'jev_rerank' then return opts.switch ~= false end
+            if name == 'jev_compare' then return opts.compare == true end
             if name == 'ascii_mode' then return opts.ascii == true end
             return false
         end,
@@ -117,13 +118,14 @@ local function texts(candidates)
     return table.concat(out, ',')
 end
 
-local function write_cache(key, order, badge)
+local function write_cache(key, order, badge, scores)
     local path = CLIENT.cache_dir .. '/' .. key .. '.json'
     local handle = assert(io.open(path, 'w'))
     handle:write(JSON.encode({
         v = 1,
         ok = true,
         order = JSON.array(order),
+        scores = scores or {},
         badge = badge or 'AI',
         confidence = 0.9,
         expires_at = os.time() + 300,
@@ -132,7 +134,8 @@ local function write_cache(key, order, badge)
     return path
 end
 
-local function key_for(code, context, candidate_texts)    local texts_normalized = {}
+local function key_for(code, context, candidate_texts)
+    local texts_normalized = {}
     for index, text in ipairs(candidate_texts) do
         texts_normalized[index] = CLIENT.normalize_text(text)
     end
@@ -214,6 +217,26 @@ test('命中缓存时按顺序重排并追加标记', function()
     local collected = run_filter(env, candidates)
     assert_eq('拟好,你好,尼豪', texts(collected))
     assert_eq('AI', collected[1].comment)
+end)
+
+test('对比模式保留原顺序, 只标注概率与模型首选', function()
+    local code = 'duibi'
+    local names = { '你好', '尼豪', '拟好' }
+    local key = key_for(code, '', names)
+    -- 缓存里给的是会改动顺序的结果 (拟好第一) 加各候选概率, 对比模式必须忽略顺序只用概率
+    write_cache(key, { 2, 0, 1 }, 'AI', { ['0'] = 0.1, ['1'] = 0.2, ['2'] = 0.7 })
+
+    local env = make_env({ input = code, compare = true })
+    FILTER.init(env)
+    local candidates = {
+        make_candidate(names[1]),
+        make_candidate(names[2]),
+        make_candidate(names[3]),
+    }
+    local collected = run_filter(env, candidates)
+    assert_eq('你好,尼豪,拟好', texts(collected), '对比模式不该重排')
+    assert_true(collected[3].comment:find('★', 1, true) ~= nil, '模型首选应带星: ' .. collected[3].comment)
+    assert_true(collected[1].comment ~= '', '其它候选应带百分比')
 end)
 
 test('缓存里的顺序不合法时保持原顺序但仍加标记', function()

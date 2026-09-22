@@ -104,4 +104,27 @@ function M.apply_badge(candidates, badge)
     return true
 end
 
+--- 对比模式: 不动顺序, 只在每个候选的注释里写上模型给它的概率, 并在模型的首选前加星.
+-- 这样一屏就能看出 "词库按词频排的顺序" 与 "模型想排的顺序" 差在哪.
+function M.annotate_scores(candidates, positions, scores, top_index)
+    if not scores then return 0 end
+    local annotated = 0
+    for slot = 1, #positions do
+        local candidate = candidates[positions[slot]]
+        local score = scores[tostring(slot - 1)]
+        if candidate and type(score) == 'number' then
+            local text = string.format('%d%%', math.floor(score * 100 + 0.5))
+            if top_index ~= nil and (slot - 1) == top_index then
+                text = '★' .. text
+            end
+            local comment = candidate.comment or ''
+            if not comment:find(text, 1, true) then
+                candidate.comment = (comment == '') and text or (comment .. ' ' .. text)
+                annotated = annotated + 1
+            end
+        end
+    end
+    return annotated
+end
+
 return M

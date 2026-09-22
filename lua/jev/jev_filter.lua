@@ -16,6 +16,9 @@ local RERANK = require('jev/jev_rerank')
 
 local M = {}
 
+-- 对比模式开关名 (由 rime-patch 片段注册, 默认 Control+Shift+K 切换)
+local COMPARE_OPTION = 'jev_compare'
+
 -- ---------------------------------------------------------------- 配置读取
 
 local function read_config(schema_config)
@@ -221,6 +224,20 @@ local function rerank(candidates, env)
     end
     if response.ok ~= true then
         log_debug(env, '后端返回错误: %s', tostring(response.error))
+        return
+    end
+
+    -- 对比模式 (开关 jev_compare): 保留词库原顺序, 只标注模型概率 + 给模型首选打星
+    if env.engine.context:get_option(COMPARE_OPTION) then
+        local top = response.order and response.order[1]
+        local count = RERANK.annotate_scores(candidates, positions, response.scores, top)
+        log_debug(
+            env,
+            '对比模式: 标注 %d 个候选, 未改顺序 (模型首选=%s 置信=%s)',
+            count,
+            tostring(top),
+            tostring(response.confidence)
+        )
         return
     end
 

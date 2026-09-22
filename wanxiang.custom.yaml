@@ -398,15 +398,21 @@ patch:
   "engine/filters/+":
     - lua_filter@*jev.jev_filter
 
-  # AI开关: Control+Shift+J 切换; 想在状态面板里记住它, 把 jev_rerank 加进
+  # AI 开关: Control+Shift+J 切换; 想在状态面板里记住它, 把 jev_rerank 加进
   # default.yaml 的 switcher/save_options
+  # 对比开关: Control+Shift+K 切换. 打开后不改顺序, 只在每个候选注释里标注模型概率,
+  # 并给模型的首选打星 (★87%), 用来对比 "词库词频顺序" 与 "模型想排的顺序"
   "switches/+":
     - name: jev_rerank
       states: [ AI关, AI开 ]
       reset: 1
+    - name: jev_compare
+      states: [ 对比关, 对比开 ]
+      reset: 0
 
   "key_binder/bindings/+":
     - { when: always, accept: Control+Shift+J, toggle: jev_rerank }
+    - { when: always, accept: Control+Shift+K, toggle: jev_compare }
 
   jev_rerank:
     # 运行时目录: 由 patch-config 按本机平台自动填入, 与 sidecar 的 runtime_dir 同源

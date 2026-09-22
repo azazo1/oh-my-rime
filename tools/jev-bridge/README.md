@@ -26,7 +26,7 @@ tools/jev-bridge (本项目)
   server.py    http://127.0.0.1:20006/health  仅用于调试
 ```
 
-运行数据全部在仓库之外: `~/Library/Caches/rime-jev/{queue,cache,log,backup}`。
+运行数据全部在仓库之外: `~/Library/Caches/rime-jev/{queue,cache,log,backup}`.
 
 ## 快速开始 (mock 后端, 不需要任何 key 与模型)
 
@@ -52,6 +52,9 @@ just deploy-rime                              # 鼠须管重新部署
 然后在任意输入框里按 `Control+Shift+J` 打开 `AI开`, 打字观察首位候选注释是否出现 `AI`,
 以及候选顺序是否按分数变化. 关掉开关或停掉 sidecar 后行为必须与改动前完全一致.
 
+想直观对比"词库顺序"与"模型想排的顺序", 按 `Control+Shift+K` 打开**对比模式**: 候选保持原顺序,
+注释里逐个标出模型概率, 模型的首选带星 (例如 `大家 ★75%`, 而词库把它排在最后).
+
 ## 配置
 
 两层配置, 各管一摊:
@@ -64,10 +67,10 @@ just deploy-rime                              # 鼠须管重新部署
 
 调试端点默认在 `http://127.0.0.1:20006` (`http_host` / `http_port`), 打字路径不经过它;
 `base_url` 里的端口是**后端自己监听**的端口 (默认 `8090`, 与 localjev-mlx 的默认值一致),
-和 sidecar 的调试端口 `20006` 是两件事。
+和 sidecar 的调试端口 `20006` 是两件事.
 
 `config.toml` 的所有项都能被同名环境变量覆盖: `JEV_BACKEND`, `JEV_BASE_URL`, `JEV_MODEL`,
-`JEV_ALLOW_CLOUD`, `JEV_RUNTIME_DIR`, `JEV_HTTP_HOST`, `JEV_HTTP_PORT`, `JEV_LOG_LEVEL`, `JEV_DEBUG`, `TYPESAFE_API_KEY`。
+`JEV_ALLOW_CLOUD`, `JEV_RUNTIME_DIR`, `JEV_HTTP_HOST`, `JEV_HTTP_PORT`, `JEV_LOG_LEVEL`, `JEV_DEBUG`, `TYPESAFE_API_KEY`.
 用 `just config` 看最终生效值. 配置带 `config_version`, 升级走 `config_migrations.py`, 不做隐式兼容.
 
 ### 后端
@@ -79,18 +82,18 @@ just deploy-rime                              # 鼠须管重新部署
 | `http` + `https://api.typesafe.ai` | 官方 Jev 云端, 需要 key | 70-500ms, 只能 async |
 
 云端后端会把上文送出本机, 因此 `base_url` 指向非本机地址时**必须显式** `allow_cloud = true`,
-否则配置校验直接报错, 并且后端在运行时也会拒绝调用。
+否则配置校验直接报错, 并且后端在运行时也会拒绝调用.
 
 ### 两种模式
 
-- `async` (默认): 过滤器只读缓存, 未命中就投递预取请求后立刻返回原顺序。下一次刷新同一编码时命中缓存,
-  顺序立即生效。按键路径零等待, 代价是首次输入看不到重排。
-- `sync`: 未命中时投递并等待 `timeout_ms`, 超时同样原序放行, 结果稍后进缓存。
-  只有后端 ≲30ms 时才不卡手; 云端 Jev 和本机 Laya 都达不到, 所以默认是 async。
+- `async` (默认): 过滤器只读缓存, 未命中就投递预取请求后立刻返回原顺序. 下一次刷新同一编码时命中缓存,
+  顺序立即生效. 按键路径零等待, 代价是首次输入看不到重排.
+- `sync`: 未命中时投递并等待 `timeout_ms`, 超时同样原序放行, 结果稍后进缓存.
+  只有后端 ≲30ms 时才不卡手; 云端 Jev 和本机 Laya 都达不到, 所以默认是 async.
 
 实测参考 (Apple M1, `convaiinnovations/laya` 421M, 单问一答): **P50 89.7ms / P95 170.7ms**,
-首次调用还要额外预热 (实测 >800ms, 因此 `backend_timeout_ms` 默认放宽到 3000ms)。
-想换更省时的 checkpoint 就调整 `just laya` 的 `--repo` / `--subfolder` (例如上游的 `multilingual`)。
+首次调用还要额外预热 (实测 >800ms, 因此 `backend_timeout_ms` 默认放宽到 3000ms).
+想换更省时的 checkpoint 就调整 `just laya` 的 `--repo` / `--subfolder` (例如上游的 `multilingual`).
 
 ## 命令
 
@@ -125,19 +128,19 @@ uv run jev-bridge serve          # 或 uv run jev-bridge once 只处理一轮
 | Rime 用户目录 | macOS `~/Library/Rime`; Linux 依次找 `~/.local/share/fcitx5/rime`, `~/.config/ibus/rime`, `~/.local/share/fcitx/rime`; Windows `%APPDATA%\Rime` |
 
 只有想覆盖默认值时才需要动手: 环境变量 `JEV_RUNTIME_DIR` / `RIME_USER_DIR`, schema 里的 `jev_rerank/runtime_dir`,
-或 `patch-config --rime-dir`。`just paths` 会打印推导结果, 并核对两侧 runtime_dir 是否一致 (不一致时非零退出)。
+或 `patch-config --rime-dir`.`just paths` 会打印推导结果, 并核对两侧 runtime_dir 是否一致 (不一致时非零退出).
 
-Lua 侧 `runtime_dir` 支持 `~` 展开, Windows 下建目录会自动换成 `cmd.exe` 的写法, 不需要额外处理。
+Lua 侧 `runtime_dir` 支持 `~` 展开, Windows 下建目录会自动换成 `cmd.exe` 的写法, 不需要额外处理.
 
-平台专属的部分只有 **常驻方式**: `just install-agent` 用的是 launchd (macOS)。
+平台专属的部分只有 **常驻方式**: `just install-agent` 用的是 launchd (macOS).
 Linux 直接抄 `systemd/jev-bridge.service` (文件末尾写了安装命令), Windows 用计划任务或 `nssm`,
 内容都是同一条 `jev-bridge serve`;
-不装常驻服务时前台运行也完全可用, sidecar 不在线时过滤器只花 0.2ms 跳过, 不影响打字。
+不装常驻服务时前台运行也完全可用, sidecar 不在线时过滤器只花 0.2ms 跳过, 不影响打字.
 
 ### 本机 Laya 后端的隔离启动
 
 不要跑 `localjev-mlx` 的 `install.sh`: 它会建 `~/.localjev-mlx`, 写 `~/.config/localjev-mlx`,
-装 launchd 常驻服务, 还会往 `~/.claude` / `~/.codex` / `~/.cursor` / `~/.grok` 里塞它的 skill。
+装 launchd 常驻服务, 还会往 `~/.claude` / `~/.codex` / `~/.cursor` / `~/.grok` 里塞它的 skill.
 它本身只是个普通 Python 包, 我们直接用 `uv tool run` 在临时环境里跑:
 
 #### 用哪个 checkpoint (M1 实测, 18 条中文冒烟集 + 冷缓存)
@@ -148,9 +151,9 @@ Linux 直接抄 `systemd/jev-bridge.service` (文件末尾写了安装命令), W
 | `convaiinnovations/laya` | 421M | 38.9% (改对 0, 改错 0) | 89.7 / 170.7 ms | 英文主训练, **对中文几乎没有区分力** |
 
 复现命令: `just laya-stop`, `just laya-bg --repo <上面的 id>`, 然后
-`uv run jev-bridge eval --fresh --tag <名字>` (case 集在 `benchmarks/chinese_cases.json`)。
-换 checkpoint 后 sidecar 会检测到后端身份变化并自动清掉旧缓存, 不会串味。
-权重都留在 `~/.cache/huggingface`, 不要哪个就删对应的 `models--*` 目录。
+`uv run jev-bridge eval --fresh --tag <名字>` (case 集在 `benchmarks/chinese_cases.json`).
+换 checkpoint 后 sidecar 会检测到后端身份变化并自动清掉旧缓存, 不会串味.
+权重都留在 `~/.cache/huggingface`, 不要哪个就删对应的 `models--*` 目录.
 
 ```shell
 cd ~/Library/Rime/tools/jev-bridge
@@ -170,7 +173,7 @@ just laya-stop         # 停掉
 | 系统服务 / 家目录配置 | **不写** (没有 LaunchAgent, 没有 `~/.config/localjev-mlx`, 不动 `~/.claude` 等目录) |
 
 默认端口 8090 (`--port` 可改), 与 `config.toml` 里的 `base_url` 默认值一致;
-请求体里的 `model` 字段它不校验, 返回的 `model` 是它加载的 HF 仓库名。
+请求体里的 `model` 字段它不校验, 返回的 `model` 是它加载的 HF 仓库名.
 把 sidecar 切到它:
 
 ```toml
@@ -178,12 +181,12 @@ backend = "http"
 base_url = "http://127.0.0.1:8090"
 ```
 
-然后 `just config` 确认、重启 sidecar、`just bench 20` 看延迟。
+然后 `just config` 确认, 重启 sidecar, `just bench 20` 看延迟.
 
 ### Windows 上怎么真正用上 Jev
 
 `localjev-mlx` / `laya-mlx` 走的是 Apple MLX, **Windows 上没有本地后端可用**, 所以 Windows 只有云端一条路
-(或任何自己实现 `POST /v1/systemone` 的服务)。需要改的就三行:
+(或任何自己实现 `POST /v1/systemone` 的服务). 需要改的就三行:
 
 ```toml
 # %USERPROFILE%\.config\rime-jev\config.toml
@@ -194,10 +197,10 @@ allow_cloud = true                        # 必须显式打开, 云端会收到�
 ```
 
 api_key 建议走环境变量而不是写进文件: PowerShell 里 `$env:TYPESAFE_API_KEY = "..."`,
-要持久化就 `setx TYPESAFE_API_KEY "..."` (重开终端生效)。
+要持久化就 `setx TYPESAFE_API_KEY "..."` (重开终端生效).
 
 schema 侧的 `jev_rerank/mode` 要改成 `async` (或把 `timeout_ms` 压到 10 左右): 云端延迟 70-500ms,
-`sync` 只会让每次按键白等一个超时。async 的代价是首次输入某个编码看不到重排, 同一个编码第二次出现时才生效。
+`sync` 只会让每次按键白等一个超时.async 的代价是首次输入某个编码看不到重排, 同一个编码第二次出现时才生效.
 
 链路本身与平台无关, sidecar 每次按键做的事就是发这样一次请求, 再按返回的概率重排候选:
 
@@ -214,7 +217,7 @@ POST https://api.typesafe.ai/v1/systemone
 ```
 
 返回 `answers.best_continuation.probabilities` 与 `confidence`; 置信度或首选概率不达门限就保持原顺序,
-只加 `AI` 标记。
+只加 `AI` 标记.
 
 ## 排障
 
@@ -227,7 +230,7 @@ POST https://api.typesafe.ai/v1/systemone
 | 云端被拒 | `allow_cloud` 未开, 这是有意为之的安全默认 |
 | 端口占用 | 改 `config.toml` 的 `http_port`, 或只用文件队列 (HTTP 端点只是调试用) |
 
-日志位置: `~/Library/Caches/rime-jev/log/sidecar.log` (轮转, 2MB x 3)。
+日志位置: `~/Library/Caches/rime-jev/log/sidecar.log` (轮转, 2MB x 3).
 
 ## 测试
 
@@ -238,4 +241,4 @@ just test-lua    # lua 解释器跑 lua/jev 的纯逻辑与文件队列
 ```
 
 两侧共享同一份缓存键向量 `tests/fixtures/key_vectors.json`: Lua 与 Python 任一方的归一化规则改动
-都会让对方的测试失败, 避免出现"缓存永远不命中"这种难查的线上问题。
+都会让对方的测试失败, 避免出现"缓存永远不命中"这种难查的线上问题.

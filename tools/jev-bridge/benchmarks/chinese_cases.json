@@ -1,6 +1,6 @@
 {
   "name": "zh-rerank-smoke",
-  "note": "中文候选重排的小样本冒烟集: 每条给出上文/编码/候选, expected 是唯一自然衔接的候选。约三分之一的 case 原顺序首位就是答案 (baseline 不会被压到 0), 其余把答案放在后面, 用来观察模型改对/改错的比例。",
+  "note": "中文候选重排的小样本冒烟集: 每条给出上文/编码/候选, expected 是唯一自然衔接的候选. 约三分之一的 case 原顺序首位就是答案 (baseline 不会被压到 0), 其余把答案放在后面, 用来观察模型改对/改错的比例.",
   "cases": [
     { "name": "超市购物", "context": "我昨天去超市买了", "code": "shuiguo", "expected": "水果", "candidates": ["水锅", "谁说", "水果", "水过"] },
     { "name": "早起锻炼", "context": "他每天早上六点就起床", "code": "duanlian", "expected": "锻炼", "candidates": ["锻炼", "段炼", "断链", "缎练"] },
