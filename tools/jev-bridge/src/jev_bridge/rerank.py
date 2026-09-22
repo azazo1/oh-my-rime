@@ -263,22 +263,26 @@ class Reranker:
             "expires_at": int(time.time()) + self.config.cache_ttl_s,
         }
         self.cache.put(key, payload)
-        # 记下"改前改后"的首选文本: 只有 code 和顺序号时排障太吃力
-        before_top = texts[0] if texts else ""
-        after_top = before_top
-        if order:
-            after_top = texts[indices.index(order[0])]
+        # 日志必须区分"模型自己想选谁"和"最终生效的首位": 前者被门限/规则挡住时两者不同,
+        # 只看生效首位会误以为模型判对了 (曾经因此误判过"没有 vs 魅友"的问题).
+        model_top_text = ""
+        if scores:
+            model_top_key = max(scores, key=lambda item: scores[item])
+            model_top_text = texts[indices.index(int(model_top_key))]
+        applied_top_text = texts[indices.index(order[0])] if order else ""
         log.info(
             "打分完成 backend=%s model=%s code=%s 候选=%d 置信=%.2f 顺序变化=%s "
-            "首选=%s%s 延迟=%.1fms",
+            "模型首选=%s(%.2f) 生效首位=%s%s 延迟=%.1fms",
             result.backend,
             result.model,
             req.get("code"),
             len(indices),
             confidence,
             changed,
-            after_top,
-            "" if after_top == before_top else f"(原 {before_top})",
+            model_top_text,
+            scores.get(model_top_key, 0.0) if scores else 0.0,
+            applied_top_text,
+            "" if applied_top_text == model_top_text else "(被门限或规则挡住)",
             result.latency_ms,
         )
         return self._assemble(req, key, payload, cached_flag=False, latency_ms=result.latency_ms)
