@@ -62,6 +62,8 @@ function M.build_request(opts)
         show_confidence = opts.show_confidence and true or false,
         -- 双拼展开结果, 只是给模型的提示 (可能不准, 说明里已声明)
         pinyin_hint = opts.pinyin or nil,
+        -- 编码的音节数: sidecar 用它保证"覆盖整串编码的候选"不被短候选挤下去
+        syllables = opts.syllables or nil,
     }
     return request, key
 end

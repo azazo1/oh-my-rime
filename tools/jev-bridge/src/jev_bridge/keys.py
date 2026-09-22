@@ -10,7 +10,7 @@ tests/fixtures/key_vectors.json.
 from __future__ import annotations
 
 PROTOCOL_VERSION = 1
-PROMPT_VERSION = 2
+PROMPT_VERSION = 3
 KEY_PREFIX = "v1"
 CANDIDATE_SEPARATOR = "\x1f"
 

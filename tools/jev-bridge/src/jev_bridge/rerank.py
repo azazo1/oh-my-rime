@@ -72,12 +72,33 @@ def candidate_indices(candidates: list[dict]) -> list[int]:
     return indices
 
 
+def group_by_coverage(
+    indices: list[int],
+    lengths: dict[int, int],
+    syllables: int,
+) -> tuple[list[int], list[int]]:
+    """按"是否覆盖整串编码"分两组.
+
+    实测模型偏爱更常见的短词: 输入 hvjxle (hui jia le) 时它会把「回家」提到「回家了」前面,
+    但用户打满整串编码通常是想要整串. 所以把候选分成"覆盖整串"与"只覆盖一部分",
+    让模型只在组内调序; syllables <= 1 时全部算覆盖, 规则自然失效.
+    """
+    if syllables <= 1:
+        return list(indices), []
+    full = [index for index in indices if lengths.get(index, 0) >= syllables]
+    partial = [index for index in indices if lengths.get(index, 0) < syllables]
+    if not full or not partial:
+        return list(indices), []
+    return full, partial
+
+
 def decide(
     indices: list[int],
     probabilities: dict[str, float],
     confidence: float | None,
     min_confidence: float,
     min_top_prob: float,
+    coverage: tuple[list[int], list[int]] | None = None,
 ) -> tuple[list[int], dict[str, float], float, bool]:
     """返回 (order, scores, confidence, changed)."""
     scores = {str(index): 0.0 for index in indices}
@@ -95,7 +116,14 @@ def decide(
     if total > 0:
         scores = {key: value / total for key, value in scores.items()}
 
-    ranked = sorted(indices, key=lambda index: (-scores[str(index)], index))
+    if coverage and coverage[1]:
+        # 覆盖整串的候选永远排在只覆盖一部分的前面, 各自组内按概率排
+        full, partial = coverage
+        ranked = sorted(full, key=lambda index: (-scores[str(index)], index)) + sorted(
+            partial, key=lambda index: (-scores[str(index)], index)
+        )
+    else:
+        ranked = sorted(indices, key=lambda index: (-scores[str(index)], index))
     top_probability = scores[str(ranked[0])] if ranked else 0.0
     resolved_confidence = (
         round(float(confidence), 4)
@@ -190,6 +218,7 @@ class Reranker:
             result.confidence,
             self.config.min_confidence,
             self.config.min_top_prob,
+            coverage=self._coverage(req, indices, texts),
         )
         badge = render_badge(
             str(req.get("badge") if req.get("badge") is not None else self.config.badge),
@@ -217,17 +246,39 @@ class Reranker:
             "expires_at": int(time.time()) + self.config.cache_ttl_s,
         }
         self.cache.put(key, payload)
+        # 记下"改前改后"的首选文本: 只有 code 和顺序号时排障太吃力
+        before_top = texts[0] if texts else ""
+        after_top = before_top
+        if order:
+            after_top = texts[indices.index(order[0])]
         log.info(
-            "打分完成 backend=%s model=%s code=%s 候选=%d 置信=%.2f 顺序变化=%s 延迟=%.1fms",
+            "打分完成 backend=%s model=%s code=%s 候选=%d 置信=%.2f 顺序变化=%s "
+            "首选=%s%s 延迟=%.1fms",
             result.backend,
             result.model,
             req.get("code"),
             len(indices),
             confidence,
             changed,
+            after_top,
+            "" if after_top == before_top else f"(原 {before_top})",
             result.latency_ms,
         )
         return self._assemble(req, key, payload, cached_flag=False, latency_ms=result.latency_ms)
+
+    @staticmethod
+    def _coverage(req: dict, indices: list[int], texts: list[str]) -> tuple[list[int], list[int]] | None:
+        """按编码音节数把候选分成"覆盖整串"与"只覆盖一部分"; 关掉该规则时返回 None."""
+        if not req.get("respect_full_code", True):
+            return None
+        try:
+            syllables = int(req.get("syllables") or 0)
+        except (TypeError, ValueError):
+            return None
+        if syllables <= 1:
+            return None
+        lengths = {index: len(text) for index, text in zip(indices, texts)}
+        return group_by_coverage(indices, lengths, syllables)
 
     @staticmethod
     def _state_hooks(req: dict) -> dict:

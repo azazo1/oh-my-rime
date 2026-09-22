@@ -9,7 +9,7 @@ local M = {}
 
 -- 协议版本: 缓存键前缀与请求体 v 字段共用
 M.protocol_version = 1
-M.prompt_version = 2
+M.prompt_version = 3
 
 -- 运行时数据目录 (仓库之外, 不进版本控制).
 -- 默认按平台推导, 规则与 sidecar 的 paths.py 一致; 也可以在 schema 的
@@ -41,8 +41,9 @@ M.debug = false
 M.instructions = table.concat({
   'The user is typing Chinese, and the text before the cursor is given as context.',
   'Choose which candidate the user most likely intends next.',
-  'Prefer the candidate that reads naturally after the context.',
-  'The code is a keyboard string; pinyin_hint, when present, is a best-effort expansion of it,',
+  'Prefer the candidate that reads naturally after the context',
+  'and that accounts for the whole typed code rather than only its beginning;',
+  'the code is a keyboard string and pinyin_hint is a best-effort expansion of it,',
   'so neither of them is reliable evidence on its own.',
 }, ' ')
 

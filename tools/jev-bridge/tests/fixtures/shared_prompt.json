@@ -1,3 +1,3 @@
 {
-  "instructions": "The user is typing Chinese, and the text before the cursor is given as context. Choose which candidate the user most likely intends next. Prefer the candidate that reads naturally after the context. The code is a keyboard string; pinyin_hint, when present, is a best-effort expansion of it, so neither of them is reliable evidence on its own."
+  "instructions": "The user is typing Chinese, and the text before the cursor is given as context. Choose which candidate the user most likely intends next. Prefer the candidate that reads naturally after the context and that accounts for the whole typed code rather than only its beginning; the code is a keyboard string and pinyin_hint is a best-effort expansion of it, so neither of them is reliable evidence on its own."
 }

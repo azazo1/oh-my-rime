@@ -207,9 +207,13 @@ local function rerank(candidates, env)
     -- 协议里的 mode 只有 sync (会等待) 与 prefetch (不等), 与配置里的 async/sync 不是同一套取值
     local request_mode = (config.mode == 'sync') and 'sync' or 'prefetch'
     -- 双拼按键串对模型没意义 (它不认识 nihc = ni hao), 尽量展开成全拼当提示
-    local pinyin
+    local pinyin, syllables
     if config.pinyin_scheme ~= 'none' then
-        pinyin = PINYIN.expand(env.engine.context.input)
+        local _, parts = PINYIN.expand(env.engine.context.input)
+        if parts then
+            pinyin = table.concat(parts, ' ')
+            syllables = #parts
+        end
     end
     local request, key = RERANK.build_request({
         picked = picked,
@@ -217,6 +221,7 @@ local function rerank(candidates, env)
         schema_id = env.engine.schema.schema_id,
         code = env.engine.context.input,
         pinyin = pinyin,
+        syllables = syllables,
         mode = request_mode,
         timeout_ms = config.timeout_ms,
         context_chars = config.context_chars,
