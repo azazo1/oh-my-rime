@@ -13,6 +13,7 @@
 local DEFAULTS = require('jev/defaults')
 local CLIENT = require('jev/jev_client')
 local RERANK = require('jev/jev_rerank')
+local PINYIN = require('jev/jev_pinyin')
 
 local M = {}
 
@@ -69,6 +70,10 @@ local function read_config(schema_config)
     config.max_candidates = get_number('max_candidates') or config.max_candidates
     config.min_code_len = get_number('min_code_len') or config.min_code_len
     config.min_context_chars = get_number('min_context_chars') or config.min_context_chars
+    local pinyin_scheme = get_string('pinyin_scheme')
+    if pinyin_scheme then
+        config.pinyin_scheme = pinyin_scheme
+    end
     config.context_chars = get_number('context_chars') or config.context_chars
     config.context_buffer_chars = get_number('context_buffer_chars')
         or config.context_buffer_chars
@@ -201,11 +206,17 @@ local function rerank(candidates, env)
 
     -- 协议里的 mode 只有 sync (会等待) 与 prefetch (不等), 与配置里的 async/sync 不是同一套取值
     local request_mode = (config.mode == 'sync') and 'sync' or 'prefetch'
+    -- 双拼按键串对模型没意义 (它不认识 nihc = ni hao), 尽量展开成全拼当提示
+    local pinyin
+    if config.pinyin_scheme ~= 'none' then
+        pinyin = PINYIN.expand(env.engine.context.input)
+    end
     local request, key = RERANK.build_request({
         picked = picked,
         context = state.context,
         schema_id = env.engine.schema.schema_id,
         code = env.engine.context.input,
+        pinyin = pinyin,
         mode = request_mode,
         timeout_ms = config.timeout_ms,
         context_chars = config.context_chars,

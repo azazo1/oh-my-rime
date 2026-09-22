@@ -162,8 +162,8 @@ local function key_for(code, context, candidate_texts)
     )
 end
 
---- 读取队列里最新一个请求的 mode 字段 (协议里只有 sync / prefetch 两种)
-local function read_last_request_mode()
+--- 读取队列里最新一个请求 (完整表)
+local function read_last_request()
     local pipe = io.popen('ls -t "' .. CLIENT.queue_dir .. '"/*.req.json 2>/dev/null | head -1')
     local path = pipe:read('*l')
     pipe:close()
@@ -172,7 +172,12 @@ local function read_last_request_mode()
     if not handle then return nil end
     local text = handle:read('a')
     handle:close()
-    local decoded = JSON.decode(text)
+    return JSON.decode(text)
+end
+
+--- 读取队列里最新一个请求的 mode 字段 (协议里只有 sync / prefetch 两种)
+local function read_last_request_mode()
+    local decoded = read_last_request()
     return decoded and decoded.mode
 end
 
@@ -376,6 +381,28 @@ test('请求里的 mode 取值符合协议 (async -> prefetch, sync -> sync)', f
     init_filter(env2, TEST_CONTEXT)
     run_filter(env2, { make_candidate('请求框'), make_candidate('情况况') })
     assert_eq('sync', read_last_request_mode())
+end)
+
+test('双拼按键串会被展开成拼音提示', function()
+    clear_queue()
+    touch_heartbeat()
+    local env = make_env({ input = 'nihc' })      -- 小鹤双拼: nihc = ni hao
+    init_filter(env, TEST_CONTEXT)
+    run_filter(env, { make_candidate('拟好'), make_candidate('你好') })
+    local request = read_last_request()
+    assert_true(request ~= nil, '没有投递请求')
+    assert_eq('nihc', request.code)
+    assert_eq('ni hao', request.pinyin_hint, '双拼没有被展开')
+
+    -- 非双拼 (全拼) 输入不该硬套键位表
+    clear_queue()
+    touch_heartbeat()
+    local env2 = make_env({ input = 'dajia' })
+    init_filter(env2, TEST_CONTEXT)
+    run_filter(env2, { make_candidate('大家'), make_candidate('打架') })
+    local request2 = read_last_request()
+    assert_true(request2 ~= nil, '没有投递请求')
+    assert_nil(request2.pinyin_hint, '全拼不该被强行展开')
 end)
 
 test('配置段可以覆盖默认值', function()

@@ -60,6 +60,8 @@ function M.build_request(opts)
         cache_key = key,
         badge = opts.badge,
         show_confidence = opts.show_confidence and true or false,
+        -- 双拼展开结果, 只是给模型的提示 (可能不准, 说明里已声明)
+        pinyin_hint = opts.pinyin or nil,
     }
     return request, key
 end

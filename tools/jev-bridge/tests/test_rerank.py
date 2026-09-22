@@ -98,6 +98,30 @@ def test_handle_rejects_unsupported_version(reranker: Reranker) -> None:
     assert response["error"] == "unsupported_version"
 
 
+def test_pinyin_hint_goes_into_state(config: Config, cache: DiskCache) -> None:
+    """双拼展开结果要传给后端, 且只在请求带了它的时候."""
+    captured: dict = {}
+
+    class CaptureBackend:
+        name = "capture"
+
+        def score(self, state, question, model):
+            captured["state"] = state
+            return build_backend(config).score(state, question, model)
+
+        def raw_call(self, body: dict) -> dict:
+            return {}
+
+    reranker = Reranker(config, cache, CaptureBackend())
+    reranker.handle(make_request(["拟好", "你好"], pinyin_hint="ni hao"))
+    assert captured["state"]["pinyin_hint"] == "ni hao"
+    assert captured["state"]["input"] == "nihao"
+
+    captured.clear()
+    reranker.handle(make_request(["大家", "打架"], code="dajia", request_id="t2"))
+    assert "pinyin_hint" not in captured["state"]
+
+
 def test_handle_trusts_client_cache_key(config: Config, cache: DiskCache) -> None:
     """Lua 与 sidecar 的键不一致时以 Lua 的键为准, 保证 Lua 直读缓存仍然有效."""
     reranker = Reranker(config, cache, build_backend(config))

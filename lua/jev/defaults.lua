@@ -26,6 +26,7 @@ M.prefetch_debounce_ms = 80   -- 预取去抖, 避免每个按键都投递
 M.max_candidates = 8          -- 参与重排的候选个数上限
 M.min_code_len = 2            -- 编码长度低于它就跳过
 M.min_context_chars = 3       -- 上文短于它就跳过 (没有依据时不要改词库顺序)
+M.pinyin_scheme = 'flypy'     -- 双拼键位表 (目前支持 flypy = 小鹤双拼), 'none' 表示不展开
 M.context_chars = 30          -- 送给模型的上文尾部字符数 (与缓存键共用)
 M.context_buffer_chars = 120  -- Lua 侧保留的上文长度
 -- 置信度/首选概率门限在 sidecar 侧 (config.toml 的 min_confidence / min_top_prob), 这里不重复定义
@@ -41,8 +42,8 @@ M.instructions = table.concat({
   'The user is typing Chinese, and the text before the cursor is given as context.',
   'Choose which candidate the user most likely intends next.',
   'Prefer the candidate that reads naturally after the context.',
-  'Treat the code as a weak hint only: it may be abbreviated or follow a double-pinyin layout,',
-  'so a candidate that merely sounds like the code is not evidence.',
+  'The code is a keyboard string; pinyin_hint, when present, is a best-effort expansion of it,',
+  'so neither of them is reliable evidence on its own.',
 }, ' ')
 
 return M

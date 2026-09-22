@@ -172,6 +172,10 @@ class Reranker:
                 {"id": str(index), "text": text} for index, text in zip(indices, texts)
             ],
         }
+        pinyin_hint = str(req.get("pinyin_hint") or "").strip()
+        if pinyin_hint:
+            # 双拼展开结果: 只是提示, 说明里已声明可能不准
+            state["pinyin_hint"] = pinyin_hint
         state.update(self._state_hooks(req))
         result = self.backend.score(state, question, model)
         if not result.ok:

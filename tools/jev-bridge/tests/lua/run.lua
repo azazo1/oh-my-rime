@@ -69,6 +69,7 @@ for _, file in ipairs({
     'test_json.lua',
     'test_client.lua',
     'test_rerank.lua',
+    'test_pinyin.lua',
     'test_platform.lua',
     'test_filter.lua',
 }) do

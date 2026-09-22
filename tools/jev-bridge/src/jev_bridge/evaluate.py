@@ -24,8 +24,8 @@ DEFAULT_INSTRUCTIONS = (
     "The user is typing Chinese, and the text before the cursor is given as context. "
     "Choose which candidate the user most likely intends next. "
     "Prefer the candidate that reads naturally after the context. "
-    "Treat the code as a weak hint only: it may be abbreviated or follow a double-pinyin layout, "
-    "so a candidate that merely sounds like the code is not evidence."
+    "The code is a keyboard string; pinyin_hint, when present, is a best-effort expansion of it, "
+    "so neither of them is reliable evidence on its own."
 )
 
 
