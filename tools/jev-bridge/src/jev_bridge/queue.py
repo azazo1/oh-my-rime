@@ -31,6 +31,7 @@ class QueueStats:
     processed: int = 0
     coalesced: int = 0
     dropped_stale: int = 0
+    waited_debounce: int = 0
     dropped_invalid: int = 0
     errors: int = 0
     cleaned: int = 0
@@ -41,6 +42,7 @@ class QueueStats:
             "processed": self.processed,
             "coalesced": self.coalesced,
             "dropped_stale": self.dropped_stale,
+            "waited_debounce": self.waited_debounce,
             "dropped_invalid": self.dropped_invalid,
             "errors": self.errors,
             "cleaned": self.cleaned,
@@ -110,6 +112,13 @@ class QueueWorker:
                 self._unlink(path)
                 continue
 
+            # 真 debounce: 预取请求要等"安静期"过去才处理, 期间来了更新的请求就把这条丢掉.
+            # (Rime 侧没有定时器, 只能按"距上次投递"限流, 那样会丢掉突发输入的最后一次按键)
+            if not self._is_quiet_enough(request, path):
+                self.stats.waited_debounce += 1
+                log.debug("预取等待安静期 %s (code=%s)", path.name, request.get("code"))
+                continue
+
             key = self._key_of(request)
             groups.setdefault(key, []).append((str(request.get("id") or ""), path))
 
@@ -152,6 +161,22 @@ class QueueWorker:
         except OSError:
             return False
         return age_ms > self.config.prefetch_max_age_ms
+
+    def _is_quiet_enough(self, request: dict, path: Path) -> bool:
+        """真 debounce 的安静期判断: 预取请求自写入后安静超过 prefetch_debounce_ms 才处理.
+
+        期间若用户又按了键, 那条更新的请求会写进队列并把这条变成"过期预取"被丢弃,
+        所以最终被送去打分的永远是用户停下来的那个编码, 而不是突发输入里的随机一次按键.
+        """
+        if request.get("mode") != "prefetch":
+            return True
+        if self.config.prefetch_debounce_ms <= 0:
+            return True
+        try:
+            age_ms = (time.time() - path.stat().st_mtime) * 1000
+        except OSError:
+            return True
+        return age_ms >= self.config.prefetch_debounce_ms
 
     def _load(self, path: Path) -> dict | None:
         try:

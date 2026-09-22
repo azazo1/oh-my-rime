@@ -22,7 +22,6 @@ M.cache_dir = M.runtime_dir .. '/cache'
 M.mode = 'async'              -- async (从不等待) | sync (有界等待)
 M.timeout_ms = 30             -- sync 模式下单次重排的等待预算
 M.prefetch = true             -- 上下文更新时提前投递请求
-M.prefetch_debounce_ms = 80   -- 预取去抖, 避免每个按键都投递
 M.max_candidates = 8          -- 参与重排的候选个数上限
 M.min_code_len = 2            -- 编码长度低于它就跳过
 M.min_context_chars = 3       -- 上文短于它就跳过 (没有依据时不要改词库顺序)

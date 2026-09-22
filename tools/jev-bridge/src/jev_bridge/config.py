@@ -38,6 +38,9 @@ class Config:
 
     poll_interval_ms: int = 5
     prefetch_max_age_ms: int = 1500
+    # 预取请求的安静期: 自写入起超过这个时间仍没被更新的请求取代, 才送去打分 (真 debounce).
+    # Rime 侧没有定时器只能做限流, 那样会丢掉突发输入的最后一次按键, 所以这条规则放在 sidecar.
+    prefetch_debounce_ms: int = 120
     backend_timeout_ms: int = 3000
 
     cache_ttl_s: int = 600

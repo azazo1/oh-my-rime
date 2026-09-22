@@ -30,9 +30,8 @@
     mode: async
     timeout_ms: 60           # 仅 sync 模式生效, 超时即原序放行
     prefetch: true           # 未命中时投递预取请求, 结果供下一次刷新使用
-    # 0 = 每个按键都投递: sidecar 会丢弃被新请求取代的旧 prefetch, 队列不会堆积.
-    # 设成 200ms 这类去抖会让快速输入的最后一次按键被丢掉, 那个编码永远不会被模型看到
-    prefetch_debounce_ms: 0
+    # 去抖不在这里做: Rime 侧没有定时器, 按键之间不会被唤醒, 只能限流 (会丢掉尾部按键).
+    # 真正的 debounce 由 sidecar 负责 (config.toml 的 prefetch_debounce_ms), 这里只负责每个按键都投递
     max_candidates: 8        # 参与重排的候选个数上限
     min_code_len: 2          # 编码长度低于它就跳过
     min_context_chars: 3     # 上文短于它就跳过 (没有依据时不要动词库顺序)

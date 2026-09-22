@@ -77,8 +77,6 @@ local function read_config(schema_config)
     config.context_chars = get_number('context_chars') or config.context_chars
     config.context_buffer_chars = get_number('context_buffer_chars')
         or config.context_buffer_chars
-    config.prefetch_debounce_ms = get_number('prefetch_debounce_ms')
-        or config.prefetch_debounce_ms
 
     local prefetch = get_bool('prefetch')
     if prefetch ~= nil then config.prefetch = prefetch end
@@ -134,20 +132,13 @@ end
 
 -- ---------------------------------------------------------------- 主体
 
+-- 每个按键都投递: 这里做不了 debounce (按键之间不会被唤醒), 限流会丢掉突发输入的最后一次按键.
+-- 真正的安静期判断在 sidecar 侧 (config.toml 的 prefetch_debounce_ms), 它会丢弃被新请求取代的旧预取.
 local function should_submit(state, config)
     if config.mode == 'sync' then
         return true
     end
-    if not config.prefetch then
-        return false
-    end
-    local now = CLIENT.now_ms()
-    local last = state.last_submit_ms
-    if last and (now - last) < config.prefetch_debounce_ms then
-        return false
-    end
-    state.last_submit_ms = now
-    return true
+    return config.prefetch and true or false
 end
 
 local function eligible(state, env, candidates)

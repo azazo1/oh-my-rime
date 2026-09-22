@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -68,6 +69,31 @@ def test_stale_prefetch_is_dropped(config: Config) -> None:
     assert worker.stats.dropped_stale == 1
     assert not list(config.queue_path.glob("*.req.json"))
     assert not list(config.queue_path.glob("*.res.json"))
+
+
+def test_fresh_prefetch_waits_for_the_quiet_period(config: Config) -> None:
+    """真 debounce: 预取请求要安静 prefetch_debounce_ms 之后才打分, 期间会被更新的请求取代."""
+    worker, backend = build_worker(config)
+    write_request(config, make_request(["你好", "尼豪"], mode="prefetch", request_id="fresh"))
+    assert worker.tick() == 0, "刚写入的预取不该立刻打分"
+    assert backend.calls == 0
+    assert worker.stats.waited_debounce == 1
+    # 请求文件要留着, 等安静期过去
+    assert len(list(config.queue_path.glob("*.req.json"))) == 1
+
+    # 安静期过去之后才处理
+    path = next(config.queue_path.glob("*.req.json"))
+    age = (config.prefetch_debounce_ms + 50) / 1000
+    os.utime(path, (time.time() - age, time.time() - age))
+    assert worker.tick() == 1
+    assert backend.calls == 1
+    assert worker.stats.waited_debounce == 1
+
+    # 同步请求不受安静期影响 (同样的候选会命中上一步写下的缓存, 所以后端调用数不变)
+    write_request(config, make_request(["你好", "尼豪"], mode="sync", request_id="sync-now"))
+    assert worker.tick() == 1
+    assert worker.stats.processed == 2
+    assert backend.calls == 1
 
 
 def test_invalid_request_is_dropped(config: Config) -> None:
