@@ -44,7 +44,9 @@ class Config:
     cache_max_entries: int = 2000
 
     max_candidates: int = 8
-    min_confidence: float = 0.5
+    # 本机 Laya 报出的 confidence 偏保守: 18 条中文样本上 0.5 会挡掉一次正确重排,
+    # 0.3 时 applied 与模型的 top-1 一致 (50%); 用云端 Jev 时可以调回 0.5
+    min_confidence: float = 0.3
     min_top_prob: float = 0.34
     badge: str = "AI"
     show_confidence: bool = False

@@ -9,7 +9,7 @@ local M = {}
 
 -- 协议版本: 缓存键前缀与请求体 v 字段共用
 M.protocol_version = 1
-M.prompt_version = 1
+M.prompt_version = 2
 
 -- 运行时数据目录 (仓库之外, 不进版本控制).
 -- 默认按平台推导, 规则与 sidecar 的 paths.py 一致; 也可以在 schema 的
@@ -25,21 +25,24 @@ M.prefetch = true             -- 上下文更新时提前投递请求
 M.prefetch_debounce_ms = 80   -- 预取去抖, 避免每个按键都投递
 M.max_candidates = 8          -- 参与重排的候选个数上限
 M.min_code_len = 2            -- 编码长度低于它就跳过
+M.min_context_chars = 3       -- 上文短于它就跳过 (没有依据时不要改词库顺序)
 M.context_chars = 30          -- 送给模型的上文尾部字符数 (与缓存键共用)
 M.context_buffer_chars = 120  -- Lua 侧保留的上文长度
-M.min_confidence = 0.5        -- 顺序变化的最小置信度
-M.min_top_prob = 0.34         -- 首选概率下限
+-- 置信度/首选概率门限在 sidecar 侧 (config.toml 的 min_confidence / min_top_prob), 这里不重复定义
 M.badge = 'AI'                -- 首位候选注释里追加的标记
 M.show_confidence = false     -- 是否在标记里带上置信度百分比
 M.schemas = { wanxiang = true, wanxiang_pro = true }
 M.debug = false
 
--- 问题模板: 面向英文主训练的判定模型, 说明用英文, 状态里带中文
+-- 问题模板: 面向英文主训练的判定模型, 说明用英文, 状态里带中文.
+-- "code 只是弱线索" 这句是必须的: 双拼方案下 code 是按键串 (例如 nihc 其实是 nihao), 模型认不出来,
+-- 不说明的话它会去挑"拼音看起来最像 code"的候选, 反而把词库正确的首选挤下去.
 M.instructions = table.concat({
-  'The user is typing Chinese with a pinyin input method.',
-  'Given the code being typed and the text typed just before it,',
-  'choose which candidate the user most likely intends.',
+  'The user is typing Chinese, and the text before the cursor is given as context.',
+  'Choose which candidate the user most likely intends next.',
   'Prefer the candidate that reads naturally after the context.',
+  'Treat the code as a weak hint only: it may be abbreviated or follow a double-pinyin layout,',
+  'so a candidate that merely sounds like the code is not evidence.',
 }, ' ')
 
 return M

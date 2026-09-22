@@ -46,6 +46,7 @@ end
 local function make_env(options)
     local opts = options or {}
     local state = { connected = false, disconnected = false }
+    local holder = {}   -- 存过滤器的 commit 回调, 供测试注入上屏文本
     local context = {
         input = opts.input or 'nihao',
         get_option = function(_, name)
@@ -67,6 +68,7 @@ local function make_env(options)
             connect = function(_, fn)
                 state.connected = true
                 state.commit_fn = fn
+                holder.commit_fn = fn
                 return {
                     disconnect = function() state.disconnected = true end,
                 }
@@ -82,6 +84,11 @@ local function make_env(options)
             context = context,
         },
     }
+    -- init_filter(env, '上文') 会调用它, 把这段文字送进过滤器的上文缓冲
+    env.__commit_fn = function(text)
+        assert_true(holder.commit_fn ~= nil, '过滤器还没连接 commit_notifier')
+        holder.commit_fn({ get_commit_text = function() return text end })
+    end
     return env, state
 end
 
@@ -118,16 +125,23 @@ local function texts(candidates)
     return table.concat(out, ',')
 end
 
+--- 写一个与 sidecar 真实缓存文件同构的载荷.
+-- 关键: 真实缓存文件里**没有 ok 字段** (ok 只出现在 HTTP 响应里). 早期这里自己补了 ok = true,
+-- 于是"过滤器只认 ok"的 bug 被测试掩盖, 线上表现为所有缓存命中被当成错误丢弃.
 local function write_cache(key, order, badge, scores)
     local path = CLIENT.cache_dir .. '/' .. key .. '.json'
     local handle = assert(io.open(path, 'w'))
     handle:write(JSON.encode({
         v = 1,
-        ok = true,
+        prompt_version = DEFAULTS.prompt_version,
         order = JSON.array(order),
         scores = scores or {},
-        badge = badge or 'AI',
         confidence = 0.9,
+        order_changed = true,
+        badge = badge or 'AI',
+        backend = 'test',
+        model = 'test',
+        cache_key = key,
         expires_at = os.time() + 300,
     }))
     handle:close()
@@ -178,6 +192,18 @@ local function drop_heartbeat()
     os.remove(CLIENT.queue_dir .. '/heartbeat')
 end
 
+--- 过滤器默认要求上文至少 min_context_chars 个字, 所以测试要么注入上文, 要么明确测"上文太短".
+local TEST_CONTEXT = '他说话很幽默,'
+
+--- 初始化过滤器, 并可选地把它当成"已经上屏了这段文字".
+local function init_filter(env, context)
+    FILTER.init(env)
+    if context and context ~= '' then
+        assert_true(env.__commit_fn ~= nil, '测试桩没有暴露 commit 回调')
+        env.__commit_fn(context)
+    end
+end
+
 test('过滤器初始化与释放不抛异常', function()
     local env, state = make_env()
     assert_true(pcall(FILTER.init, env))
@@ -205,13 +231,7 @@ test('命中缓存时按顺序重排并追加标记', function()
     write_cache(key, { 2, 0, 1 })
 
     local env = make_env({ input = code })
-    FILTER.init(env)
-    -- 模拟已经上屏的上文
-    env.engine.context.commit_notifier.connect = function(_, fn)
-        fn({ get_commit_text = function() return context end })
-        return { disconnect = function() end }
-    end
-    FILTER.init(env)
+    init_filter(env, context)
 
     local candidates = { make_candidate(names[1]), make_candidate(names[2]), make_candidate(names[3]) }
     local collected = run_filter(env, candidates)
@@ -222,12 +242,12 @@ end)
 test('对比模式保留原顺序, 只标注概率与模型首选', function()
     local code = 'duibi'
     local names = { '你好', '尼豪', '拟好' }
-    local key = key_for(code, '', names)
+    local key = key_for(code, TEST_CONTEXT, names)
     -- 缓存里给的是会改动顺序的结果 (拟好第一) 加各候选概率, 对比模式必须忽略顺序只用概率
     write_cache(key, { 2, 0, 1 }, 'AI', { ['0'] = 0.1, ['1'] = 0.2, ['2'] = 0.7 })
 
     local env = make_env({ input = code, compare = true })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     local candidates = {
         make_candidate(names[1]),
         make_candidate(names[2]),
@@ -242,26 +262,47 @@ end)
 test('缓存里的顺序不合法时保持原顺序但仍加标记', function()
     local code = 'ceshi'
     local names = { '测试', '侧视' }
-    local key = key_for(code, '', names)
+    local key = key_for(code, TEST_CONTEXT, names)
     write_cache(key, { 5, 5 })
 
     local env = make_env({ input = code })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     local candidates = { make_candidate(names[1]), make_candidate(names[2]) }
     local collected = run_filter(env, candidates)
     assert_eq('测试,侧视', texts(collected))
     assert_eq('AI', collected[1].comment)
 end)
 
+test('上文太短时跳过 (没有依据就不要改词库顺序)', function()
+    local code = 'nihao'
+    local names = { '你好', '尼豪' }
+    local key = key_for(code, '', names)
+    write_cache(key, { 1, 0 })   -- 缓存里明明有"要换顺序"的结果
+
+    local env = make_env({ input = code })
+    init_filter(env)             -- 不注入上文
+    local collected = run_filter(env, { make_candidate(names[1]), make_candidate(names[2]) })
+    assert_eq('你好,尼豪', texts(collected), '上文为空时不该采用重排结果')
+    assert_eq('', collected[1].comment)
+
+    -- 上文够长时同样的缓存就会生效
+    local env2 = make_env({ input = code })
+    init_filter(env2, TEST_CONTEXT)
+    local key2 = key_for(code, TEST_CONTEXT, names)
+    write_cache(key2, { 1, 0 })
+    local collected2 = run_filter(env2, { make_candidate(names[1]), make_candidate(names[2]) })
+    assert_eq('尼豪,你好', texts(collected2))
+end)
+
 test('编码过短或候选过少时跳过', function()
     local env = make_env({ input = 'n' })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     local collected = run_filter(env, { make_candidate('你'), make_candidate('拟') })
     assert_eq('你,拟', texts(collected))
     assert_eq('', collected[1].comment)
 
     local env2 = make_env({ input = 'nihao' })
-    FILTER.init(env2)
+    init_filter(env2, TEST_CONTEXT)
     local collected2 = run_filter(env2, { make_candidate('你') })
     assert_eq('你', texts(collected2))
     assert_eq('', collected2[1].comment)
@@ -269,19 +310,19 @@ end)
 
 test('英文模式与非 abc 段落跳过', function()
     local env = make_env({ ascii = true })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     local collected = run_filter(env, { make_candidate('你好'), make_candidate('尼豪') })
     assert_eq('', collected[1].comment)
 
     local env2 = make_env({ tag = 'punct' })
-    FILTER.init(env2)
+    init_filter(env2, TEST_CONTEXT)
     local collected2 = run_filter(env2, { make_candidate('你好'), make_candidate('尼豪') })
     assert_eq('', collected2[1].comment)
 end)
 
 test('方案不在白名单时跳过', function()
     local env = make_env({ schema_id = 'wanxiang_reverse' })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     local collected = run_filter(env, { make_candidate('你好'), make_candidate('尼豪') })
     assert_eq('', collected[1].comment)
 end)
@@ -289,7 +330,7 @@ end)
 test('没有缓存且 async 模式时投递请求并原序返回', function()
     touch_heartbeat()
     local env = make_env({ input = 'qingshu' })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     local candidates = { make_candidate('请示'), make_candidate('情书') }
     local collected = run_filter(env, candidates)
     assert_eq('请示,情书', texts(collected))
@@ -305,7 +346,7 @@ test('sidecar 不在线时不投递也不等待', function()
     clear_queue()
     drop_heartbeat()
     local env = make_env({ input = 'meirenkuang' })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     local started = CLIENT.now_ms()
     local collected = run_filter(env, { make_candidate('没人'), make_candidate('美人') })
     local elapsed = CLIENT.now_ms() - started
@@ -322,7 +363,7 @@ test('请求里的 mode 取值符合协议 (async -> prefetch, sync -> sync)', f
     clear_queue()
     touch_heartbeat()
     local env = make_env({ input = 'qingqiukuang' })
-    FILTER.init(env)
+    init_filter(env, TEST_CONTEXT)
     run_filter(env, { make_candidate('请求框'), make_candidate('情况况') })
     assert_eq('prefetch', read_last_request_mode())
 
@@ -332,7 +373,7 @@ test('请求里的 mode 取值符合协议 (async -> prefetch, sync -> sync)', f
         input = 'qingqiukuang',
         config_values = { mode = 'sync', timeout_ms = 5 },
     })
-    FILTER.init(env2)
+    init_filter(env2, TEST_CONTEXT)
     run_filter(env2, { make_candidate('请求框'), make_candidate('情况况') })
     assert_eq('sync', read_last_request_mode())
 end)

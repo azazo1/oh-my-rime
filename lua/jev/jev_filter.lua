@@ -68,6 +68,7 @@ local function read_config(schema_config)
     config.timeout_ms = get_number('timeout_ms') or config.timeout_ms
     config.max_candidates = get_number('max_candidates') or config.max_candidates
     config.min_code_len = get_number('min_code_len') or config.min_code_len
+    config.min_context_chars = get_number('min_context_chars') or config.min_context_chars
     config.context_chars = get_number('context_chars') or config.context_chars
     config.context_buffer_chars = get_number('context_buffer_chars')
         or config.context_buffer_chars
@@ -167,6 +168,11 @@ local function eligible(state, env, candidates)
     if #candidates < 2 then
         return false, 'few_candidates'
     end
+    -- 上文太短就没有判断依据 (实测此时模型会去猜"哪个候选读音像 code", 反而把词库正确的首选挤掉)
+    local context_length = utf8.len(state.context or '') or 0
+    if context_length < config.min_context_chars then
+        return false, 'short_context'
+    end
 
     local composition = context.composition
     local segment = composition and composition:back()
@@ -222,8 +228,10 @@ local function rerank(candidates, env)
         log_debug(env, '未命中 (%s) submit=%s key=%s', tostring(info.reason), tostring(submit), key)
         return
     end
-    if response.ok ~= true then
-        log_debug(env, '后端返回错误: %s', tostring(response.error))
+    -- 判定"结果可用"看的是 order 字段本身, 不只依赖 ok: 缓存文件与 HTTP 响应是两种载体,
+    -- 只认 ok 会让缓存命中被误判成错误 (早期版本就是因此让缓存完全失效).
+    if response.ok ~= true and type(response.order) ~= 'table' then
+        log_debug(env, '结果不可用: ok=%s error=%s', tostring(response.ok), tostring(response.error))
         return
     end
 

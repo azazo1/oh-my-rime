@@ -197,6 +197,9 @@ class Reranker:
             ),
         )
         payload = {
+            # ok 必须写进缓存文件: Rime 侧直接读这个文件, 用它判断"这是一条可用结果".
+            # 之前只写 HTTP 响应而漏了这里, 结果所有缓存命中都被过滤器当成错误丢掉.
+            "ok": True,
             "v": PROTOCOL_VERSION,
             "prompt_version": int(req.get("prompt_version") or PROMPT_VERSION),
             "order": order,

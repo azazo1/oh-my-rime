@@ -57,8 +57,9 @@ cache_max_entries = 2000
 # ---------------------------------------------------------------- 重排规则
 
 max_candidates = 8
-# 置信度与首选概率双门限, 任一不达标就保持原顺序
-min_confidence = 0.5
+# 置信度与首选概率双门限, 任一不达标就保持原顺序.
+# 本机 Laya 的 confidence 偏保守 (实测 0.5 会挡掉正确重排), 所以默认 0.3; 云端 Jev 可以调回 0.5.
+min_confidence = 0.3
 min_top_prob = 0.34
 badge = "AI"
 show_confidence = false

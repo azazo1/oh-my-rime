@@ -21,10 +21,11 @@ from .rerank import Reranker
 # 与 lua/jev/defaults.lua 的 M.instructions 必须一致; 由 tests/fixtures/shared_prompt.json
 # 两侧共同断言, 改一处而忘了另一处会直接测试失败.
 DEFAULT_INSTRUCTIONS = (
-    "The user is typing Chinese with a pinyin input method. "
-    "Given the code being typed and the text typed just before it, "
-    "choose which candidate the user most likely intends. "
-    "Prefer the candidate that reads naturally after the context."
+    "The user is typing Chinese, and the text before the cursor is given as context. "
+    "Choose which candidate the user most likely intends next. "
+    "Prefer the candidate that reads naturally after the context. "
+    "Treat the code as a weak hint only: it may be abbreviated or follow a double-pinyin layout, "
+    "so a candidate that merely sounds like the code is not evidence."
 )
 
 
