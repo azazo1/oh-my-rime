@@ -1,0 +1,16 @@
+{
+  "name": "zh-homophone-guard",
+  "note": "同音词专集: 每条只考一件事 —— 词库已经把正确写法放在首位时, 后端会不会把它换成更罕见的同音写法. baseline_top1 恒为 100%, 所以这里只看 broken (改错) 和 fixed (本来错的被改对, 本集里应为 0).",
+  "cases": [
+    { "name": "什么 与 甚么", "context": "这是", "code": "ufme", "expected": "什么", "candidates": ["什么", "甚么", "伸", "深", "神", "审", "甚", "身"] },
+    { "name": "没有 与 魅友", "context": "我今天", "code": "mwyz", "expected": "没有", "candidates": ["没有", "魅友", "煤油", "美柚", "煤友", "酶友", "每有", "妹友"] },
+    { "name": "回家 与 回驾", "context": "他下班之后就", "code": "hvjx", "expected": "回家", "candidates": ["回家", "回驾", "汇佳", "会加", "惠佳", "灰甲", "徽家", "回夹"] },
+    { "name": "在 与 再", "context": "我现在", "code": "zd", "expected": "在", "candidates": ["在", "再", "载", "仔", "宰", "崽", "栽", "灾"] },
+    { "name": "做 与 作", "context": "他今天想在家里", "code": "zo", "expected": "做", "candidates": ["做", "作", "坐", "座", "左", "昨", "佐", "唑"] },
+    { "name": "象 与 像", "context": "这头大", "code": "xn", "expected": "象", "candidates": ["象", "像", "向", "想", "响", "项", "相", "香"] },
+    { "name": "那 与 哪", "context": "我说的就是", "code": "na", "expected": "那", "candidates": ["那", "哪", "拿", "纳", "呐", "娜", "钠", "衲"] },
+    { "name": "是 与 事", "context": "这真的", "code": "ui", "expected": "是", "candidates": ["是", "事", "时", "十", "使", "式", "市", "识"] },
+    { "name": "的 与 得", "context": "这是他写", "code": "de", "expected": "的", "candidates": ["的", "得", "地", "德", "底", "低", "滴", "敌"] },
+    { "name": "时候 与 事后", "context": "你什么", "code": "uihz", "expected": "时候", "candidates": ["时候", "事后", "石猴", "时后", "什后", "试后", "是后", "识后"] }
+  ]
+}

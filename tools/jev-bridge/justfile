@@ -1,6 +1,9 @@
 # just recipe 集合: jev-bridge 的开发与日常操作
 # 用法示例写在每个 recipe 上方的注释里, 最后一行是 just --list 显示的简介.
 
+# 自动加载 .env (放 TYPESAFE_API_KEY 之类的密钥; 该文件已在 .gitignore 中)
+set dotenv-load := true
+
 [private]
 default:
     @just --list
@@ -42,6 +45,15 @@ laya-stop:
 # 例: just eval --fresh --tag multilingual
 eval *args:
     uv run jev-bridge eval {{args}}
+
+# 用云端 TypeSafe Jev 跑同一批 case (key 从 .env 读取; 注意会把上文发送到云端)
+# 例: just eval-cloud --cases benchmarks/same_pinyin_cases.json --fresh --tag cloud
+eval-cloud *args:
+    JEV_BASE_URL=https://api.typesafe.ai JEV_MODEL=jev-latest JEV_ALLOW_CLOUD=1 uv run jev-bridge eval {{args}}
+
+# 只检查 .env 有没有被加载, 不打印任何密钥内容
+env-check:
+    @test -n "$$TYPESAFE_API_KEY" && echo "TYPESAFE_API_KEY: 已从 .env 加载" || echo "TYPESAFE_API_KEY: 未加载 (检查 tools/jev-bridge/.env)"
 
 # 看 Laya 后端状态
 laya-status:

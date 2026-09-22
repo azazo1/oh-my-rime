@@ -241,7 +241,7 @@ local function rerank(candidates, env)
     })
 
     if not response then
-        log_debug(env, '未命中 (%s) submit=%s key=%s', tostring(info.reason), tostring(submit), key)
+        log_debug(env, '未命中 (%s) submit=%s code=%s key=%s', tostring(info.reason), tostring(submit), tostring(env.engine.context.input), key)
         return
     end
     -- 判定"结果可用"看的是 order 字段本身, 不只依赖 ok: 缓存文件与 HTTP 响应是两种载体,
@@ -269,7 +269,8 @@ local function rerank(candidates, env)
         RERANK.apply_order(candidates, positions, response.order)
         log_debug(
             env,
-            '重排完成 cached=%s 置信=%s 顺序=%s',
+            '重排完成 code=%s cached=%s 置信=%s 顺序=%s',
+            tostring(env.engine.context.input),
             tostring(info.cached),
             tostring(response.confidence),
             table.concat(response.order, ',')
