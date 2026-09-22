@@ -61,6 +61,9 @@ max_candidates = 8
 # 本机 Laya 的 confidence 偏保守 (实测 0.5 会挡掉正确重排), 所以默认 0.3; 云端 Jev 可以调回 0.5.
 min_confidence = 0.3
 min_top_prob = 0.34
+# 模型换掉词库首位所需的最小领先幅度, 默认 0 表示不干预.
+# 调大 (如 0.2) 能减少候选跳动, 但挡不住同音词的自信错判
+override_margin = 0.0
 badge = "AI"
 show_confidence = false
 

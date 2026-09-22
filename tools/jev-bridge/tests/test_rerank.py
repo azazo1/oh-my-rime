@@ -183,6 +183,45 @@ def test_coverage_grouping_rules() -> None:
     assert group_by_coverage([0, 1, 2, 3], lengths, 1) == ([0, 1, 2, 3], [])
 
 
+def test_override_margin_keeps_dictionary_top_for_near_ties(config: Config, cache: DiskCache) -> None:
+    """同音词 (没有 vs 魅友) 只能靠词频区分: 模型领先不够时必须保留词库首位.
+
+    该规则默认关闭 (override_margin = 0), 这里显式打开以锁住行为.
+    """
+    from dataclasses import replace
+
+    from jev_bridge.backends import build_backend as _build
+
+    guarded = replace(config, override_margin=0.2)
+
+    class FixedBackend:
+        name = "fixed"
+
+        def __init__(self, probabilities):
+            self.probabilities = probabilities
+
+        def score(self, state, question, model):
+            result = _build(config).score(state, question, model)
+            result.probabilities = self.probabilities
+            result.confidence = 0.99
+            return result
+
+        def raw_call(self, body: dict) -> dict:
+            return {}
+
+    # 模型给「魅友」(index 1) 0.55, 「没有」(index 0) 0.45: 只差 0.1, 不该换
+    near = Reranker(guarded, cache, FixedBackend({"0": 0.45, "1": 0.55, "2": 0.0}))
+    response = near.handle(make_request(["没有", "魅友", "煤油"], code="mwyz", request_id="m1"))
+    assert response["order"][0] == 0, "领先幅度不够时不该换掉词库首位"
+
+    # 领先足够 (0.9 vs 0.1) 就允许换
+    clear = Reranker(guarded, cache, FixedBackend({"0": 0.1, "1": 0.9, "2": 0.0}))
+    response2 = clear.handle(
+        make_request(["没有", "魅友", "煤油"], code="mwyz", request_id="m2", context="你好呀")
+    )
+    assert response2["order"][0] == 1, "领先明显时应当允许重排"
+
+
 def test_handle_trusts_client_cache_key(config: Config, cache: DiskCache) -> None:
     """Lua 与 sidecar 的键不一致时以 Lua 的键为准, 保证 Lua 直读缓存仍然有效."""
     reranker = Reranker(config, cache, build_backend(config))

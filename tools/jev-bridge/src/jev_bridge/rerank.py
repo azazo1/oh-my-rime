@@ -99,6 +99,7 @@ def decide(
     min_confidence: float,
     min_top_prob: float,
     coverage: tuple[list[int], list[int]] | None = None,
+    margin: float = 0.0,
 ) -> tuple[list[int], dict[str, float], float, bool]:
     """返回 (order, scores, confidence, changed)."""
     scores = {str(index): 0.0 for index in indices}
@@ -124,6 +125,21 @@ def decide(
         )
     else:
         ranked = sorted(indices, key=lambda index: (-scores[str(index)], index))
+
+    # 词库顺序自带词频信息: 模型想换掉原首位时, 领先幅度不够就不换
+    # (应对"没有 vs 魅友"这类拼音完全相同、只能靠频率区分的候选)
+    if margin > 0 and indices and ranked and ranked[0] != indices[0]:
+        advantage = scores[str(ranked[0])] - scores[str(indices[0])]
+        if advantage < margin:
+            log.debug(
+                "换首位被词频先验挡住: %s(%.3f) vs %s(%.3f), 需要领先 %.2f",
+                ranked[0],
+                scores[str(ranked[0])],
+                indices[0],
+                scores[str(indices[0])],
+                margin,
+            )
+            ranked = list(indices)
     top_probability = scores[str(ranked[0])] if ranked else 0.0
     resolved_confidence = (
         round(float(confidence), 4)
@@ -219,6 +235,7 @@ class Reranker:
             self.config.min_confidence,
             self.config.min_top_prob,
             coverage=self._coverage(req, indices, texts),
+            margin=self.config.override_margin,
         )
         badge = render_badge(
             str(req.get("badge") if req.get("badge") is not None else self.config.badge),

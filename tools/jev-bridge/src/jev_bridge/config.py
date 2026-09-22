@@ -48,6 +48,9 @@ class Config:
     # 0.3 时 applied 与模型的 top-1 一致 (50%); 用云端 Jev 时可以调回 0.5
     min_confidence: float = 0.3
     min_top_prob: float = 0.34
+    # 模型想换掉词库首位时的最小领先幅度. 默认 0 = 不干预 (交给模型);
+    # 调大可以压掉"模型自己也没把握"的换位抖动, 但它挡不住同音词的自信错判, 不要拿它当纠错手段
+    override_margin: float = 0.0
     badge: str = "AI"
     show_confidence: bool = False
 
