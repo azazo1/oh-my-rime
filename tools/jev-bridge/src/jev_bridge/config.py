@@ -38,7 +38,7 @@ class Config:
 
     poll_interval_ms: int = 5
     prefetch_max_age_ms: int = 1500
-    backend_timeout_ms: int = 800
+    backend_timeout_ms: int = 3000
 
     cache_ttl_s: int = 600
     cache_max_entries: int = 2000

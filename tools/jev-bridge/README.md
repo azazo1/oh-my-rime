@@ -86,7 +86,11 @@ just deploy-rime                              # 鼠须管重新部署
 - `async` (默认): 过滤器只读缓存, 未命中就投递预取请求后立刻返回原顺序。下一次刷新同一编码时命中缓存,
   顺序立即生效。按键路径零等待, 代价是首次输入看不到重排。
 - `sync`: 未命中时投递并等待 `timeout_ms`, 超时同样原序放行, 结果稍后进缓存。
-  适合本地 Laya 这类毫秒级后端; 云端后端请勿使用。
+  只有后端 ≲30ms 时才不卡手; 云端 Jev 和本机 Laya 都达不到, 所以默认是 async。
+
+实测参考 (Apple M1, `convaiinnovations/laya` 421M, 单问一答): **P50 89.7ms / P95 170.7ms**,
+首次调用还要额外预热 (实测 >800ms, 因此 `backend_timeout_ms` 默认放宽到 3000ms)。
+想换更省时的 checkpoint 就调整 `just laya` 的 `--repo` / `--subfolder` (例如上游的 `multilingual`)。
 
 ## 命令
 
@@ -129,6 +133,40 @@ Lua 侧 `runtime_dir` 支持 `~` 展开, Windows 下建目录会自动换成 `cm
 Linux 直接抄 `systemd/jev-bridge.service` (文件末尾写了安装命令), Windows 用计划任务或 `nssm`,
 内容都是同一条 `jev-bridge serve`;
 不装常驻服务时前台运行也完全可用, sidecar 不在线时过滤器只花 0.2ms 跳过, 不影响打字。
+
+### 本机 Laya 后端的隔离启动
+
+不要跑 `localjev-mlx` 的 `install.sh`: 它会建 `~/.localjev-mlx`, 写 `~/.config/localjev-mlx`,
+装 launchd 常驻服务, 还会往 `~/.claude` / `~/.codex` / `~/.cursor` / `~/.grok` 里塞它的 skill。
+它本身只是个普通 Python 包, 我们直接用 `uv tool run` 在临时环境里跑:
+
+```shell
+cd ~/Library/Rime/tools/jev-bridge
+just laya              # 前台跑, Ctrl-C 退出
+just laya-bg           # 后台跑并等 /health 变 200 (首次要下载权重)
+just laya-status       # 看状态 (pid + health)
+just laya-stop         # 停掉
+```
+
+隔离体现在:
+
+| 项目 | 落点 |
+| --- | --- |
+| 模型权重 | huggingface-hub 的默认缓存 `~/.cache/huggingface` (想换位置自己设 `HF_HOME=... just laya`) |
+| 进程号 / 日志 | `<runtime_dir>/laya.pid`, `<runtime_dir>/log/laya.log` |
+| Python 环境 | uv 自己的工具缓存 (`uv tool run`), 不进项目 venv; 需要时 `uv cache clean` 回收 |
+| 系统服务 / 家目录配置 | **不写** (没有 LaunchAgent, 没有 `~/.config/localjev-mlx`, 不动 `~/.claude` 等目录) |
+
+默认端口 8090 (`--port` 可改), 与 `config.toml` 里的 `base_url` 默认值一致;
+请求体里的 `model` 字段它不校验, 返回的 `model` 是它加载的 HF 仓库名。
+把 sidecar 切到它:
+
+```toml
+backend = "http"
+base_url = "http://127.0.0.1:8090"
+```
+
+然后 `just config` 确认、重启 sidecar、`just bench 20` 看延迟。
 
 ### Windows 上怎么真正用上 Jev
 

@@ -19,7 +19,9 @@
     # 运行时目录: 由 patch-config 按本机平台自动填入, 与 sidecar 的 runtime_dir 同源
     # (macOS ~/Library/Caches/rime-jev, Linux ~/.cache/rime-jev, Windows %LOCALAPPDATA%\rime-jev)
     runtime_dir: "__JEV_RUNTIME_DIR__"
-    mode: sync               # sync (有界等待, 适合本机后端) | async (只读缓存 + 预取, 适合云端)
+    # async: 只读缓存 + 预取, 按键零等待; sync: 有界等待, 后端 ≲30ms 才不卡手
+    # 实测本机 Laya (421M) 在 M1 上 P50 约 90ms, 所以默认 async; 想试 sync 就调大下面的 timeout_ms
+    mode: async
     timeout_ms: 60           # 仅 sync 模式生效, 超时即原序放行
     prefetch: true           # 未命中时投递预取请求, 结果供下一次刷新使用
     prefetch_debounce_ms: 80 # 预取去抖, 避免每个按键都发一次

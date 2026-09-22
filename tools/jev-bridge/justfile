@@ -26,6 +26,22 @@ test-lua:
 run *args:
     uv run jev-bridge serve {{args}}
 
+# 前台启动本机 Laya 后端 (隔离: uv tool run + 权重落在 ~/Library/Caches/rime-jev/hf, 不装系统服务)
+laya *args:
+    uv run jev-bridge laya {{args}}
+
+# 后台启动 Laya 后端并等 /health 变 200 (首次要下载权重)
+laya-bg *args:
+    uv run jev-bridge laya --background {{args}}
+
+# 停掉后台的 Laya 后端
+laya-stop:
+    uv run jev-bridge laya --stop
+
+# 看 Laya 后端状态
+laya-status:
+    uv run jev-bridge laya --status
+
 # 处理一次积压队列后退出
 once:
     uv run jev-bridge once

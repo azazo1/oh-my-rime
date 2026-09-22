@@ -308,6 +308,50 @@ def cmd_logs(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_laya(args: argparse.Namespace) -> int:
+    """隔离地管理本机 Laya 后端 (uv tool run, 不跑它的 install.sh)."""
+    from . import laya
+
+    config = _load_or_exit(args)
+    runtime = config.runtime_path
+    port = args.port or laya.DEFAULT_PORT
+
+    if args.stop:
+        stopped = laya.stop(runtime)
+        print("已停止 localjev-mlx" if stopped else "没有在跑的 localjev-mlx")
+        return 0
+
+    if args.status:
+        payload = laya.status(runtime, port).as_dict()
+        payload["port"] = port
+        payload["log"] = str(laya.log_file(runtime))
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0 if payload["running"] else 1
+
+    if not args.background:
+        return laya.run_foreground(runtime, port, args.python, args.repo, args.subfolder)
+
+    if laya.status(runtime, port).running:
+        print(f"已经在跑 (端口 {port}); 用 --stop 先停掉再起", file=sys.stderr)
+        return 1
+    pid = laya.start_background(runtime, port, args.python, args.repo, args.subfolder)
+    print(f"已在后台启动 (pid {pid}), 日志 {laya.log_file(runtime)}", file=sys.stderr)
+    print(f"等待 /health 变 200 (首次要下载权重, 最长等 {args.wait_s}s)...", file=sys.stderr)
+
+    def _progress(elapsed: int, code: int) -> None:
+        print(f"  {elapsed}s: health={code or 'down'}", file=sys.stderr)
+
+    ready, body = laya.wait_until_ready(port, args.wait_s, _progress)
+    if not ready:
+        print("超时仍未就绪, 看日志确认是否在下载权重", file=sys.stderr)
+        return 1
+    print(
+        f"就绪: backend={body.get('backend')} model={body.get('model')} port={port}",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def cmd_deploy_rime(args: argparse.Namespace) -> int:
     """各前端重新部署; 只做能确定的事情, 找不到工具时给出人话提示."""
     platform = paths.platform_name()
@@ -503,6 +547,20 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("deploy-rime", help="重新部署 Rime (按平台自动选择命令)").set_defaults(
         func=cmd_deploy_rime
     )
+    laya = sub.add_parser(
+        "laya", help="隔离地启动/停止本机 Laya 后端 (不跑它的 install.sh)"
+    )
+    laya.add_argument("--port", type=int, default=None)
+    laya.add_argument("--python", default="3.12")
+    laya.add_argument("--repo", default="convaiinnovations/laya")
+    laya.add_argument(
+        "--subfolder", default="", help="上游仓库里选 checkpoint, 例如 multilingual"
+    )
+    laya.add_argument("--background", action="store_true")
+    laya.add_argument("--stop", action="store_true")
+    laya.add_argument("--status", action="store_true")
+    laya.add_argument("--wait-s", type=float, default=600.0, dest="wait_s")
+    laya.set_defaults(func=cmd_laya)
     paths_parser = sub.add_parser("paths", help="打印按平台推导的路径并核对两侧 runtime_dir")
     paths_parser.add_argument("--rime-dir", default=None, dest="rime_dir")
     paths_parser.set_defaults(func=cmd_paths)
