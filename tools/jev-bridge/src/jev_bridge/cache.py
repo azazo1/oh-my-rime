@@ -61,6 +61,30 @@ class DiskCache:
         self.stats = CacheStats()
         self.directory.mkdir(parents=True, exist_ok=True)
 
+    # ------------------------------------------------------------- 后端身份
+
+    def _identity_file(self) -> Path:
+        return self.directory / ".backend"
+
+    def drop_if_backend_changed(self, identity: str) -> int:
+        """后端/模型换了就清空缓存, 返回清掉的条数.
+
+        缓存键由 Rime 侧算 (只含上文/编码/候选/提示词版本), 不含模型身份, 所以换 checkpoint
+        之后旧分数会继续被命中; 与其把身份塞进跨语言键里, 不如在换后端时直接作废旧结果.
+        """
+        path = self._identity_file()
+        previous = path.read_text(encoding="utf-8").strip() if path.exists() else ""
+        if previous == identity:
+            return 0
+        removed = self.clear()
+        try:
+            path.write_text(identity, encoding="utf-8")
+        except OSError as exc:
+            log.warning("写后端身份标记失败: %s", exc)
+        if previous:
+            log.info("后端从 %s 换成 %s, 已清掉 %d 条缓存", previous, identity, removed)
+        return removed
+
     def path_for(self, key: str) -> Path:
         return self.directory / f"{key}.json"
 

@@ -14,6 +14,15 @@ def _env_text(env: dict) -> str:
     return " ".join(f"{key}={value}" for key, value in env.items())
 
 
+def test_default_repo_is_the_multilingual_checkpoint() -> None:
+    """实测中文效果与延迟都更好, 所以默认用它; 想换回英文版用 --repo."""
+    assert laya.DEFAULT_REPO == "aac6fef/laya-multilingual-mlx"
+    env = laya.process_env(Path("/tmp/x"), 8090)
+    assert env["LOCALJEV_REPO"] == laya.DEFAULT_REPO
+    overridden = laya.process_env(Path("/tmp/x"), 8090, repo="convaiinnovations/laya")
+    assert overridden["LOCALJEV_REPO"] == "convaiinnovations/laya"
+
+
 def test_tool_command_is_isolated() -> None:
     command = laya.tool_command(8090)
     assert command[1:3] == ["tool", "run"]

@@ -1,0 +1,3 @@
+{
+  "instructions": "The user is typing Chinese with a pinyin input method. Given the code being typed and the text typed just before it, choose which candidate the user most likely intends. Prefer the candidate that reads naturally after the context."
+}

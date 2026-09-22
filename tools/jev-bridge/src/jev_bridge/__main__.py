@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from . import __version__, paths
+from . import __version__, laya, paths
 from .backends import build_backend
 from .cache import DiskCache
 from .config import Config, dump_default_config, load_config
@@ -32,7 +32,7 @@ from .rime_patch import (
     default_snippet_path,
     remove_patch,
 )
-from .server import build_server
+from .server import backend_identity, build_server
 
 RUNTIME_DIR_PATTERN = re.compile(r'^\s*runtime_dir:\s*"?([^"\n]+)"?\s*$', re.MULTILINE)
 
@@ -310,8 +310,6 @@ def cmd_logs(args: argparse.Namespace) -> int:
 
 def cmd_laya(args: argparse.Namespace) -> int:
     """隔离地管理本机 Laya 后端 (uv tool run, 不跑它的 install.sh)."""
-    from . import laya
-
     config = _load_or_exit(args)
     runtime = config.runtime_path
     port = args.port or laya.DEFAULT_PORT
@@ -350,6 +348,33 @@ def cmd_laya(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     return 0
+
+
+def cmd_eval(args: argparse.Namespace) -> int:
+    """在 case 集上量首选率, 用于对比 checkpoint / 提示词."""
+    from .evaluate import DEFAULT_INSTRUCTIONS, load_cases, render_report, run_case, summarize
+
+    config = _load_or_exit(args)
+    config.ensure_dirs()
+    setup_logging(config.log_path, config.log_level, config.debug)
+    cases = load_cases(Path(args.cases))
+    cache = DiskCache(config.cache_path, config.cache_ttl_s, config.cache_max_entries)
+    if args.fresh:
+        print(f"已清空 {cache.clear()} 条缓存, 强制走真实后端", file=sys.stderr)
+    backend = build_backend(config)
+    cache.drop_if_backend_changed(backend_identity(config, backend))
+    reranker = Reranker(config, cache, backend)
+    instructions = args.instructions or DEFAULT_INSTRUCTIONS
+
+    results = []
+    for repeat in range(args.repeat):
+        for index, case in enumerate(cases):
+            results.append(run_case(reranker, case, index + repeat * len(cases), instructions))
+    summary = summarize(results, tag=args.tag)
+    summary["backend"] = backend.name
+    summary["model"] = config.model
+    print(render_report(results[: len(cases)], summary, verbose=not args.quiet))
+    return 0 if summary.get("skipped", 0) == 0 else 1
 
 
 def cmd_deploy_rime(args: argparse.Namespace) -> int:
@@ -547,20 +572,32 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("deploy-rime", help="重新部署 Rime (按平台自动选择命令)").set_defaults(
         func=cmd_deploy_rime
     )
-    laya = sub.add_parser(
+    laya_parser = sub.add_parser(
         "laya", help="隔离地启动/停止本机 Laya 后端 (不跑它的 install.sh)"
     )
-    laya.add_argument("--port", type=int, default=None)
-    laya.add_argument("--python", default="3.12")
-    laya.add_argument("--repo", default="convaiinnovations/laya")
-    laya.add_argument(
+    laya_parser.add_argument("--port", type=int, default=None)
+    laya_parser.add_argument("--python", default=laya.DEFAULT_PYTHON)
+    laya_parser.add_argument("--repo", default=laya.DEFAULT_REPO)
+    laya_parser.add_argument(
         "--subfolder", default="", help="上游仓库里选 checkpoint, 例如 multilingual"
     )
-    laya.add_argument("--background", action="store_true")
-    laya.add_argument("--stop", action="store_true")
-    laya.add_argument("--status", action="store_true")
-    laya.add_argument("--wait-s", type=float, default=600.0, dest="wait_s")
-    laya.set_defaults(func=cmd_laya)
+    laya_parser.add_argument("--background", action="store_true")
+    laya_parser.add_argument("--stop", action="store_true")
+    laya_parser.add_argument("--status", action="store_true")
+    laya_parser.add_argument("--wait-s", type=float, default=600.0, dest="wait_s")
+    laya_parser.set_defaults(func=cmd_laya)
+
+    eval_parser = sub.add_parser("eval", help="在 case 集上量候选重排的首选率")
+    eval_parser.add_argument(
+        "--cases",
+        default=str(Path(__file__).resolve().parents[2] / "benchmarks" / "chinese_cases.json"),
+    )
+    eval_parser.add_argument("--tag", default="")
+    eval_parser.add_argument("--repeat", type=int, default=1)
+    eval_parser.add_argument("--instructions", default=None)
+    eval_parser.add_argument("--fresh", action="store_true", help="先清缓存, 强制走真实后端")
+    eval_parser.add_argument("--quiet", action="store_true")
+    eval_parser.set_defaults(func=cmd_eval)
     paths_parser = sub.add_parser("paths", help="打印按平台推导的路径并核对两侧 runtime_dir")
     paths_parser.add_argument("--rime-dir", default=None, dest="rime_dir")
     paths_parser.set_defaults(func=cmd_paths)

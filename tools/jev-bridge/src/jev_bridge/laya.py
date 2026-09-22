@@ -26,7 +26,9 @@ from pathlib import Path
 LAYA_PACKAGE = "localjev-mlx[laya-mlx] @ git+https://github.com/rimusz/localjev-mlx.git"
 DEFAULT_PYTHON = "3.12"  # laya-mlx 作者实测的版本
 DEFAULT_PORT = 8090
-DEFAULT_REPO = "convaiinnovations/laya"
+# 默认用多语言 checkpoint: 实测中文候选重排 top-1 50% vs 英文版 38.9%, 延迟 35ms vs 90ms (M1).
+# 英文版是 convaiinnovations/laya (421M ModernBERT), 想换回去用 --repo 指定.
+DEFAULT_REPO = "aac6fef/laya-multilingual-mlx"
 PID_NAME = "laya.pid"
 LOG_NAME = "laya.log"
 

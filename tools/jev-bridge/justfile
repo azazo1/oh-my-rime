@@ -26,7 +26,7 @@ test-lua:
 run *args:
     uv run jev-bridge serve {{args}}
 
-# 前台启动本机 Laya 后端 (隔离: uv tool run + 权重落在 ~/Library/Caches/rime-jev/hf, 不装系统服务)
+# 前台启动本机 Laya 后端 (隔离: uv tool run, 不装系统服务; 权重在 ~/.cache/huggingface)
 laya *args:
     uv run jev-bridge laya {{args}}
 
@@ -37,6 +37,11 @@ laya-bg *args:
 # 停掉后台的 Laya 后端
 laya-stop:
     uv run jev-bridge laya --stop
+
+# 在中文 case 集上量首选率 (对比 checkpoint / 提示词; --fresh 走真实后端)
+# 例: just eval --fresh --tag multilingual
+eval *args:
+    uv run jev-bridge eval {{args}}
 
 # 看 Laya 后端状态
 laya-status:

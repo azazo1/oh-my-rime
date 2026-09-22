@@ -46,3 +46,26 @@ def test_eviction_keeps_newest(tmp_path: Path) -> None:
     assert len(remaining) == 3
     assert remaining == ["k3", "k4", "k5"]
     assert cache.stats.evicted == 3
+
+
+def test_drop_if_backend_changed(tmp_path: Path) -> None:
+    """换后端/模型必须作废旧分数: 缓存键里不含模型身份, 否则会串味."""
+    cache = DiskCache(tmp_path, ttl_s=600, max_entries=10)
+    assert cache.drop_if_backend_changed("mock|mock|mock-1") == 0
+    cache.put("k", {"order": [0]})
+    assert cache.drop_if_backend_changed("mock|mock|mock-1") == 0
+    assert cache.get("k") is not None
+    assert cache.drop_if_backend_changed("http|http:127.0.0.1|laya") == 1
+    assert not cache.path_for("k").exists()
+    assert cache.drop_if_backend_changed("http|http:127.0.0.1|laya") == 0
+
+
+def test_backend_identity_includes_backend_and_model() -> None:
+    from jev_bridge.config import Config
+    from jev_bridge.server import backend_identity
+
+    class _Backend:
+        name = "http:127.0.0.1"
+
+    config = Config(backend="http", base_url="http://127.0.0.1:8090", model="laya")
+    assert backend_identity(config, _Backend()) == "http|http:127.0.0.1|laya"

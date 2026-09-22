@@ -1,0 +1,24 @@
+{
+  "name": "zh-rerank-smoke",
+  "note": "中文候选重排的小样本冒烟集: 每条给出上文/编码/候选, expected 是唯一自然衔接的候选。约三分之一的 case 原顺序首位就是答案 (baseline 不会被压到 0), 其余把答案放在后面, 用来观察模型改对/改错的比例。",
+  "cases": [
+    { "name": "超市购物", "context": "我昨天去超市买了", "code": "shuiguo", "expected": "水果", "candidates": ["水锅", "谁说", "水果", "水过"] },
+    { "name": "早起锻炼", "context": "他每天早上六点就起床", "code": "duanlian", "expected": "锻炼", "candidates": ["锻炼", "段炼", "断链", "缎练"] },
+    { "name": "请教问题", "context": "这道题我不会做, 想跟你", "code": "qingjiao", "expected": "请教", "candidates": ["清教", "轻脚", "情交", "请教"] },
+    { "name": "下雨带伞", "context": "外面下雨了, 出门", "code": "jide", "expected": "记得", "candidates": ["记得", "基德", "挤得", "积德"] },
+    { "name": "会议时间", "context": "会议定在明天上午", "code": "shidian", "expected": "十点", "candidates": ["时点", "释点", "十点", "石点"] },
+    { "name": "幽默的人", "context": "他说话很幽默,", "code": "dajia", "expected": "大家", "candidates": ["打架", "大加", "搭架", "大家"] },
+    { "name": "下周出行", "context": "我们下周去", "code": "lvxing", "expected": "旅行", "candidates": ["旅行", "履行", "铝型", "屡行"] },
+    { "name": "菜有点咸", "context": "这道菜有点", "code": "xian", "expected": "咸", "candidates": ["闲", "显", "县", "咸"] },
+    { "name": "写完作业", "context": "他把作业写完了才去", "code": "shuijiao", "expected": "睡觉", "candidates": ["水饺", "睡觉", "税交", "谁叫"] },
+    { "name": "课后复习", "context": "老师让我们课后", "code": "fuxi", "expected": "复习", "candidates": ["复习", "负吸", "复西", "腹吸"] },
+    { "name": "手机充电", "context": "手机快没电了, 我得找个地方", "code": "chongdian", "expected": "充电", "candidates": ["冲点", "重电", "充电", "虫电"] },
+    { "name": "方案讨论", "context": "这个方案还需要再", "code": "taolun", "expected": "讨论", "candidates": ["套论", "讨论", "讨轮", "陶论"] },
+    { "name": "生病请假", "context": "他生病了, 今天不能来", "code": "shangban", "expected": "上班", "candidates": ["上板", "尚班", "商班", "上班"] },
+    { "name": "关好窗户", "context": "出门前请把窗户", "code": "guanhao", "expected": "关好", "candidates": ["关好", "官好", "观好", "管好"] },
+    { "name": "普通话流利", "context": "他的普通话说得很", "code": "liuli", "expected": "流利", "candidates": ["琉璃", "留利", "流利", "六里"] },
+    { "name": "进度慢", "context": "这个项目的进度有点", "code": "man", "expected": "慢", "candidates": ["满", "蛮", "慢", "曼"] },
+    { "name": "尽快回复", "context": "请在收到邮件后尽快", "code": "huifu", "expected": "回复", "candidates": ["回复", "恢复", "回付", "会服"] },
+    { "name": "熬夜之后", "context": "他昨天熬夜到很晚,", "code": "jintian", "expected": "今天", "candidates": ["今天", "金天", "今添", "津天"] }
+  ]
+}

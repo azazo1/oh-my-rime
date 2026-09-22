@@ -141,8 +141,14 @@ class BridgeServer:
             self._thread.join(timeout=2)
 
 
+def backend_identity(config: Config, backend) -> str:
+    """缓存要作废的身份: 换了后端或模型, 旧分数就不能再用."""
+    return f"{config.backend}|{backend.name}|{config.model}"
+
+
 def build_server(config: Config, cache: DiskCache) -> BridgeServer:
     backend = build_backend(config)
+    cache.drop_if_backend_changed(backend_identity(config, backend))
     reranker = Reranker(config, cache, backend)
     worker = QueueWorker(config, reranker)
     return BridgeServer(config, backend, cache, worker)

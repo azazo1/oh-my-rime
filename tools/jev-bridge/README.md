@@ -140,6 +140,18 @@ Linux 直接抄 `systemd/jev-bridge.service` (文件末尾写了安装命令), W
 装 launchd 常驻服务, 还会往 `~/.claude` / `~/.codex` / `~/.cursor` / `~/.grok` 里塞它的 skill。
 它本身只是个普通 Python 包, 我们直接用 `uv tool run` 在临时环境里跑:
 
+#### 用哪个 checkpoint (M1 实测, 18 条中文冒烟集 + 冷缓存)
+
+| checkpoint | 参数量 | 中文 top-1 (baseline 38.9%) | 延迟 P50 / P95 | 说明 |
+| --- | --- | --- | --- | --- |
+| `aac6fef/laya-multilingual-mlx` (**默认**) | 322M | **50.0%** (改对 2, 改错 0) | **35.4 / 68.4 ms** | 多语言 mmBERT, 上游 multilingual 的 MLX 预转换版 |
+| `convaiinnovations/laya` | 421M | 38.9% (改对 0, 改错 0) | 89.7 / 170.7 ms | 英文主训练, **对中文几乎没有区分力** |
+
+复现命令: `just laya-stop`, `just laya-bg --repo <上面的 id>`, 然后
+`uv run jev-bridge eval --fresh --tag <名字>` (case 集在 `benchmarks/chinese_cases.json`)。
+换 checkpoint 后 sidecar 会检测到后端身份变化并自动清掉旧缓存, 不会串味。
+权重都留在 `~/.cache/huggingface`, 不要哪个就删对应的 `models--*` 目录。
+
 ```shell
 cd ~/Library/Rime/tools/jev-bridge
 just laya              # 前台跑, Ctrl-C 退出
